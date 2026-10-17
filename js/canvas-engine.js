@@ -42,7 +42,8 @@ export class CanvasEngine {
     this.activeRecordingTimeText = '00:00';
 
     this.mainCtx = this.mainCanvas.getContext('2d');
-    this.liveCtx = this.liveCanvas.getContext('2d');
+    // desynchronized: kalem çizgisini ekrana tarayıcı kompozisyonunu beklemeden gönderir (düşük gecikme)
+    this.liveCtx = this.liveCanvas.getContext('2d', { desynchronized: true });
 
     // Aktif sayfa verisi
     this.page = null;
