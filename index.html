@@ -17,7 +17,78 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
 </head>
 <body>
-  <div id="appShell" class="app-shell">
+  <!-- ANA EKRAN (HOME SCREEN): KLASÖRLER VE NOT DEFTERLERİ VİTRİNİ -->
+  <div id="homeScreenView" class="home-screen-view">
+    <header class="home-topbar">
+      <div class="home-brand">
+        <div class="brand-emblem">
+          <svg viewBox="0 0 28 28" fill="none">
+            <rect x="3" y="3" width="22" height="22" rx="6" fill="#2563EB" />
+            <path d="M8 10h12M8 14.5h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
+            <path d="M16.5 21l5.5-9.5 2.5 1.5-5.5 9.5-3 .8.5-2.3z" fill="#FACC15" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="home-title">TabNote</h1>
+          <p class="home-subtitle">Klasörlerim ve Not Defterlerim</p>
+        </div>
+      </div>
+
+      <div class="home-search-bar">
+        <svg class="search-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8" />
+          <path d="M21 21l-4.3-4.3" stroke-linecap="round" />
+        </svg>
+        <input type="text" id="homeSearchInput" placeholder="Not defterlerinde, klasörlerde veya sayfa yazılarında ara..." />
+      </div>
+
+      <div class="home-top-actions">
+        <button type="button" id="homeNewFolderBtn" class="home-btn-secondary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            <line x1="12" y1="11" x2="12" y2="17" />
+            <line x1="9" y1="14" x2="15" y2="14" />
+          </svg>
+          <span>+ Yeni Klasör</span>
+        </button>
+        <button type="button" id="homeNewNotebookBtn" class="home-btn-primary">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <path d="M12 5v14M5 12h14" stroke-linecap="round" />
+          </svg>
+          <span>Yeni Not Defteri</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="home-content-scroll">
+      <!-- BÖLÜM 1: KLASÖRLER -->
+      <section class="home-section">
+        <div class="home-section-header">
+          <div class="home-section-title-group">
+            <span class="home-section-icon">📁</span>
+            <h2>Klasörler</h2>
+            <span id="homeFolderCountBadge" class="home-count-pill">0 Klasör</span>
+          </div>
+        </div>
+        <div id="homeFoldersGrid" class="home-folders-grid"></div>
+      </section>
+
+      <!-- BÖLÜM 2: NOT DEFTERLERİ -->
+      <section class="home-section">
+        <div class="home-section-header">
+          <div class="home-section-title-group">
+            <span class="home-section-icon">📓</span>
+            <h2 id="homeNotebooksSectionTitle">Not Defterleri — Tüm Notlar</h2>
+            <span id="homeNotebookCountBadge" class="home-count-pill">0 Defter</span>
+          </div>
+        </div>
+        <div id="homeNotebooksGrid" class="home-notebooks-grid"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- NOT DEFTERİ ÇALIŞMA ALANI (Başlangıçta gizli, bir not defteri seçilince açılır) -->
+  <div id="appShell" class="app-shell hidden">
     <!-- SOL ÇEKMECE: KLASÖRLER, NOT DEFTERLERİ VE SAYFA ÖNİZLEMELERİ -->
     <aside id="sidebarDrawer" class="sidebar-drawer">
       <div class="sidebar-brand-header">
@@ -90,6 +161,13 @@
       <!-- ÜST STÜDYO ÇUBUĞU -->
       <header class="studio-topbar">
         <div class="topbar-left">
+          <button type="button" id="backToHomeBtn" class="back-home-btn" title="Ana Ekrana (Klasörler ve Not Defterleri) Dön">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+              <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span>Ana Ekran</span>
+          </button>
+
           <button type="button" id="toggleSidebarBtn" class="icon-btn" title="Kenar Çubuğunu Aç/Kapat">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="4" width="18" height="16" rx="2" />
@@ -143,16 +221,6 @@
             </button>
           </div>
 
-          <!-- DOĞRUDAN SATIRA SES KAYDETME BUTONU -->
-          <button type="button" id="voiceRecordBtn" class="toolbar-chip-btn voice-chip" title="Aktif Satıra Doğrudan Ses Kaydet (Veya sayfadaki herhangi bir satırın solundaki 🎙️ butonuna basın)">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-              <line x1="12" y1="19" x2="12" y2="22" />
-            </svg>
-            <span id="voiceRecordBtnLabel">🎙️ Satıra Kaydet</span>
-          </button>
-
           <!-- İÇERİYE FOTOĞRAF, PDF VE DOSYA EKLEME BUTONU -->
           <button type="button" id="openImportModalBtn" class="toolbar-chip-btn accent-chip" title="Sayfaya Fotoğraf, PDF veya Dosya Ekle">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
@@ -194,7 +262,7 @@
 
       <!-- SAMSUNG NOTES TARZI KALEM VE MÜREKKEP İSTASYONU (STYLUS DOCK) -->
       <section class="stylus-dock-bar" aria-label="Kalem ve Çizim Araçları">
-        <!-- Kalem Uçları (Physical Pen Nibs) -->
+        <!-- Kalem Uçları ve Araç Gereçler (Physical Pen Nibs & Tools) -->
         <div class="pen-instruments-rack">
           <button type="button" class="tool-dock-btn active" data-tool="fountain" title="Dolma Kalem (Basınç Hassasiyetli Kaligrafik Uç)">
             <svg class="pen-nib-svg" viewBox="0 0 36 48">
@@ -269,13 +337,14 @@
             <span class="tool-label">Metin</span>
           </button>
 
-          <button type="button" class="tool-dock-btn" data-tool="voice" title="Satıra Ses Kaydet Aracı (Sayfada istediğin satıra dokun, direkt o satıra ses kaydı başlat)">
+          <!-- MİKROFON, SES VE NOT KAYDET AÇILIŞ EKRANI BUTONU (ARAÇ GEREÇLER İÇERİSİNDE) -->
+          <button type="button" id="openVoiceStudioModalBtn" class="tool-dock-btn voice-dock-trigger" title="Mikrofon, Ses ve Not Kaydet (Sesinizi ve notunuzu kaydedip sayfaya taşınabilir kart olarak düşürün)">
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.2">
               <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
               <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
               <line x1="12" y1="19" x2="12" y2="22" />
             </svg>
-            <span class="tool-label">Satır Ses</span>
+            <span class="tool-label">Ses & Not</span>
           </button>
 
           <button type="button" class="tool-dock-btn" data-tool="laser" title="Lazer İşaretçi (Sunum ve Çalışma İçin Kaybolan Lazer İzi)">
@@ -375,23 +444,6 @@
         </label>
       </div>
 
-      <!-- CANLI SES KAYIT ÇUBUĞU (Kayıt başladığında görünür, kalemle yazmaya engel olmaz) -->
-      <div id="voiceRecorderBar" class="voice-recorder-bar hidden">
-        <div class="rec-live-indicator">
-          <span class="rec-pulse-dot"></span>
-          <span id="recStateLabel" class="rec-state-label">Ses Kaydediliyor...</span>
-          <span id="recTimerDisplay" class="rec-timer-display">00:00</span>
-        </div>
-        <div id="recWaveBars" class="rec-wave-bars">
-          <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-        </div>
-        <div class="rec-bar-actions">
-          <button type="button" id="recPauseResumeBtn" class="rec-ctrl-btn">⏸ Duraklat</button>
-          <button type="button" id="recSaveToNoteBtn" class="rec-ctrl-btn primary">✓ Kaydı Bitir ve Nota Ekle</button>
-          <button type="button" id="recCancelBtn" class="rec-ctrl-btn danger">✕ İptal</button>
-        </div>
-      </div>
-
       <!-- TUVAL ÇALIŞMA MASASI (CANVAS VIEWPORT) -->
       <div id="canvasViewport" class="canvas-viewport">
         <div id="pageScaleWrapper" class="page-scale-wrapper">
@@ -437,6 +489,51 @@
         </div>
       </footer>
     </main>
+  </div>
+
+  <!-- MODAL: MİKROFON, SES VE NOT KAYDET AÇILIŞ EKRANI -->
+  <div id="voiceNoteStudioModal" class="modal-backdrop hidden">
+    <div class="modal-dialog voice-studio-dialog">
+      <div class="modal-header">
+        <div>
+          <h3>🎙️ Ses ve Not Kaydet</h3>
+          <p class="modal-sub">Sesinizi kaydedin ve dilerseniz notunuzu ekleyin. Kayıt sayfaya taşınabilir kart olarak düşer.</p>
+        </div>
+        <button type="button" id="closeVoiceStudioModalBtn" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body voice-studio-body">
+        <div id="voiceStudioVisualizer" class="voice-studio-visualizer">
+          <div class="voice-studio-status-row">
+            <span id="voiceStudioDot" class="voice-studio-dot"></span>
+            <span id="voiceStudioStateText" class="voice-studio-state">Mikrofon Hazır</span>
+          </div>
+          <div id="voiceStudioTimer" class="voice-studio-timer">00:00</div>
+          <div id="voiceStudioWave" class="voice-studio-wave">
+            <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
+
+          <div class="voice-studio-controls">
+            <button type="button" id="voiceStudioStartStopBtn" class="voice-main-rec-btn">
+              <span class="rec-btn-icon">●</span>
+              <span id="voiceStudioStartStopLabel">Kaydı Başlat</span>
+            </button>
+            <button type="button" id="voiceStudioPauseBtn" class="voice-sec-btn hidden">⏸ Duraklat</button>
+          </div>
+        </div>
+
+        <div class="voice-studio-note-field">
+          <label for="voiceStudioNoteInput">Ses Kaydı Başlığı / Notunuz (İsteğe Bağlı)</label>
+          <textarea id="voiceStudioNoteInput" rows="3" placeholder="Bu ses kaydıyla ilgili notunuzu veya başlığı buraya yazabilirsiniz..."></textarea>
+        </div>
+
+        <div class="voice-studio-footer">
+          <button type="button" id="voiceStudioCancelBtn" class="btn-secondary-sm">İptal</button>
+          <button type="button" id="voiceStudioDropToPageBtn" class="btn-primary-sm voice-drop-btn">
+            ✓ Kaydet ve Sayfaya Düşür
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- MODAL 0: İÇERİYE FOTOĞRAF, PDF, SES VE DOSYA EKLEME MODALI -->

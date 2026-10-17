@@ -56,8 +56,8 @@ fs.writeFileSync(path.join(assetsDir, 'index.html'), htmlCode, 'utf8');
 const manifestXml = `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.tabnote.studio"
-    android:versionCode="4"
-    android:versionName="1.3.0">
+    android:versionCode="5"
+    android:versionName="1.4.0">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -365,8 +365,18 @@ public class MainActivity extends Activity {
 
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
-            webView.goBack();
+        if (webView != null) {
+            webView.evaluateJavascript(
+                "(function(){ return (window.handleAndroidBack && window.handleAndroidBack()) ? 'HANDLED' : 'EXIT'; })()",
+                new ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String value) {
+                        if (value == null || !value.contains("HANDLED")) {
+                            MainActivity.super.onBackPressed();
+                        }
+                    }
+                }
+            );
         } else {
             super.onBackPressed();
         }
@@ -375,5 +385,6 @@ public class MainActivity extends Activity {
 `;
 
 fs.writeFileSync(path.join(javaDir, 'MainActivity.java'), mainActivityJava, 'utf8');
-console.log('APK kaynak dosyalari (v1.3.0 - Satira Dogrudan Native Ses Kaydi) apk-build/ icinde hazirlandi.');
+console.log('APK kaynak dosyalari (v1.4.0 - Ana Ekran & Taşınabilir Ses/Not Stüdyosu) apk-build/ icinde hazirlandi.');
+
 

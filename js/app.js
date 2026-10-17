@@ -34,11 +34,13 @@ class TabNoteApp {
     this.activeFolderId = 'all';
     this.activeNotebook = null;
     this.searchQuery = '';
+    this.homeSearchQuery = '';
+    this.isHomeView = true;
     this.sidebarTab = 'notebooks';
     this.saveDebounce = null;
     this.engine = null;
 
-    // Canlı Ses Kaydı Durumu
+    // Ses & Not Kayıt Stüdyosu Durumu
     this.mediaRecorder = null;
     this.audioStream = null;
     this.audioChunks = [];
@@ -47,6 +49,9 @@ class TabNoteApp {
     this.recTimerInterval = null;
     this.isRecPaused = false;
     this.recCancelled = false;
+    this.recordedAudioDataUrl = null;
+    this.recordedDurationSec = 0;
+    this.autoDropAfterStop = false;
   }
 
   async init() {
@@ -57,10 +62,38 @@ class TabNoteApp {
     this.initCanvasEngine();
     this.bindUIEvents();
     this.renderSidebar();
+    this.renderHomeScreen();
     this.loadActiveNotebookIntoWorkspace();
     this.updatePenToolbarUI();
     this.updatePenActiveUI();
+    this.showHomeScreen();
     this.registerServiceWorker();
+
+    // Android Donanımsal Geri Tuşu Desteği: Not içindeyken Ana Ekrana döner
+    window.handleAndroidBack = () => {
+      if (!this.isHomeView) {
+        this.showHomeScreen();
+        return true;
+      }
+      return false;
+    };
+  }
+
+  showHomeScreen() {
+    this.isHomeView = true;
+    document.getElementById('homeScreenView')?.classList.remove('hidden');
+    document.getElementById('appShell')?.classList.add('hidden');
+    this.renderHomeScreen();
+  }
+
+  openNotebookInEditor(notebook) {
+    if (!notebook) return;
+    this.activeNotebook = notebook;
+    this.isHomeView = false;
+    document.getElementById('homeScreenView')?.classList.add('hidden');
+    document.getElementById('appShell')?.classList.remove('hidden');
+    this.renderSidebar();
+    this.loadActiveNotebookIntoWorkspace();
   }
 
   initCanvasEngine() {
@@ -74,19 +107,6 @@ class TabNoteApp {
       onChange: () => {
         this.scheduleAutoSave();
         this.updateUndoRedoButtons();
-      },
-      onLineVoiceTrigger: ({ lineY, x, lineIndex }) => {
-        if (this.isCurrentlyRecording()) {
-          this.stopAndSaveVoiceRecording();
-        } else {
-          this.startVoiceRecording({ lineY, x, lineIndex });
-        }
-      },
-      onLineVoiceStop: () => {
-        this.stopAndSaveVoiceRecording();
-      },
-      onLineVoiceCancel: () => {
-        this.cancelVoiceRecording();
       },
       onStatusUpdate: (info) => {
         if (info.zoom !== undefined) {
@@ -182,6 +202,9 @@ class TabNoteApp {
         statusEl.textContent = 'Kaydedildi';
         statusEl.classList.remove('saving');
         this.renderNotebookList();
+        if (this.isHomeView) {
+          this.renderHomeScreen();
+        }
         if (this.sidebarTab === 'pages') {
           this.renderPageThumbnails();
         }
@@ -189,8 +212,53 @@ class TabNoteApp {
     }, 380);
   }
 
+  promptCreateNewFolder() {
+    this.openPromptModal({
+      title: 'Yeni Klasör Oluştur',
+      placeholder: 'Örn: Fizik 101, Müşteri Notları...',
+      defaultValue: '',
+      onConfirm: async (folderName) => {
+        if (!folderName.trim()) return;
+        const colors = ['#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F59E0B', '#06B6D4'];
+        const newFolder = {
+          id: `fld-${Date.now()}`,
+          name: folderName.trim(),
+          icon: 'folder',
+          color: colors[this.folders.length % colors.length],
+          system: false
+        };
+        this.folders.push(newFolder);
+        await storage.saveFolders(this.folders);
+        this.activeFolderId = newFolder.id;
+        this.renderSidebar();
+        this.renderHomeScreen();
+        this.showToast(`"${newFolder.name}" klasörü oluşturuldu.`);
+      }
+    });
+  }
+
   bindUIEvents() {
     const appShell = document.getElementById('appShell');
+
+    // Ana Ekrana Dön Butonu
+    document.getElementById('backToHomeBtn')?.addEventListener('click', () => {
+      this.showHomeScreen();
+    });
+
+    // Ana Ekran (Home View) Kontrolleri
+    document.getElementById('homeNewFolderBtn')?.addEventListener('click', () => {
+      this.promptCreateNewFolder();
+    });
+
+    document.getElementById('homeNewNotebookBtn')?.addEventListener('click', () => {
+      this.createNewNotebook(true);
+    });
+
+    document.getElementById('homeSearchInput')?.addEventListener('input', (e) => {
+      this.homeSearchQuery = e.target.value.trim().toLowerCase();
+      this.renderHomeNotebooksGrid();
+    });
+
     document.getElementById('toggleSidebarBtn').addEventListener('click', () => {
       appShell.classList.toggle('sidebar-collapsed');
     });
@@ -217,31 +285,11 @@ class TabNoteApp {
     });
 
     document.getElementById('newNotebookBtn').addEventListener('click', () => {
-      this.createNewNotebook();
+      this.createNewNotebook(true);
     });
 
     document.getElementById('newFolderBtn').addEventListener('click', () => {
-      this.openPromptModal({
-        title: 'Yeni Klasör Oluştur',
-        placeholder: 'Örn: Fizik 101, Müşteri Notları...',
-        defaultValue: '',
-        onConfirm: async (folderName) => {
-          if (!folderName.trim()) return;
-          const colors = ['#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F59E0B', '#06B6D4'];
-          const newFolder = {
-            id: `fld-${Date.now()}`,
-            name: folderName.trim(),
-            icon: 'folder',
-            color: colors[this.folders.length % colors.length],
-            system: false
-          };
-          this.folders.push(newFolder);
-          await storage.saveFolders(this.folders);
-          this.activeFolderId = newFolder.id;
-          this.renderSidebar();
-          this.showToast(`"${newFolder.name}" klasörü oluşturuldu.`);
-        }
-      });
+      this.promptCreateNewFolder();
     });
 
     document.getElementById('searchNotebooksInput').addEventListener('input', (e) => {
@@ -298,26 +346,33 @@ class TabNoteApp {
       this.engine.scrollByOffset(0, 280, true);
     });
 
-    // DOĞRUDAN SATIRA SES KAYDETME BUTONLARI
-    document.getElementById('voiceRecordBtn').addEventListener('click', () => {
+    // MİKROFON, SES VE NOT KAYDET AÇILIŞ EKRANI (MODAL) BUTONLARI
+    document.getElementById('openVoiceStudioModalBtn')?.addEventListener('click', () => {
+      this.openVoiceStudioModal();
+    });
+
+    document.getElementById('closeVoiceStudioModalBtn')?.addEventListener('click', () => {
+      this.closeVoiceStudioModal();
+    });
+
+    document.getElementById('voiceStudioCancelBtn')?.addEventListener('click', () => {
+      this.closeVoiceStudioModal();
+    });
+
+    document.getElementById('voiceStudioStartStopBtn')?.addEventListener('click', () => {
       if (this.isCurrentlyRecording()) {
-        this.stopAndSaveVoiceRecording();
+        this.stopVoiceRecordingInModal(false);
       } else {
-        const targetLineY = this.engine.snapYToLine(this.engine.lastActiveLineY || 116);
-        this.startVoiceRecording({ lineY: targetLineY });
+        this.startVoiceRecordingInModal();
       }
     });
 
-    document.getElementById('recPauseResumeBtn').addEventListener('click', () => {
+    document.getElementById('voiceStudioPauseBtn')?.addEventListener('click', () => {
       this.togglePauseVoiceRecording();
     });
 
-    document.getElementById('recSaveToNoteBtn').addEventListener('click', () => {
-      this.stopAndSaveVoiceRecording();
-    });
-
-    document.getElementById('recCancelBtn').addEventListener('click', () => {
-      this.cancelVoiceRecording();
+    document.getElementById('voiceStudioDropToPageBtn')?.addEventListener('click', () => {
+      this.dropVoiceAndNoteToPage();
     });
 
     // Geri Al / İleri Al
@@ -600,8 +655,8 @@ class TabNoteApp {
   }
 
   /**
-   * DOĞRUDAN SATIRA CANLI SES KAYDI SİSTEMİ (Android Native MediaRecorder Köprüsü + Web MediaRecorder)
-   * Asla dosya seçici açmaz; doğrudan tablet mikrofonundan ilgili satıra kayıt yapar.
+   * MİKROFON, SES VE NOT KAYDET AÇILIŞ EKRANI (MODAL) SİSTEMİ
+   * (Android Native MediaRecorder Köprüsü + Web MediaRecorder)
    */
   isCurrentlyRecording() {
     return Boolean(
@@ -609,17 +664,46 @@ class TabNoteApp {
     );
   }
 
-  async startVoiceRecording(opts = {}) {
-    const targetLineY = this.engine.snapYToLine(
-      opts.lineY || this.engine.lastActiveLineY || 116
-    );
-    const rows = this.engine.getPageLineRows();
-    const rowObj = rows.find((r) => Math.abs(r.lineY - targetLineY) <= 8);
-    const lineIndex = opts.lineIndex || (rowObj ? rowObj.index : 1);
+  openVoiceStudioModal() {
+    this.recordedAudioDataUrl = null;
+    this.recordedDurationSec = 0;
+    this.recElapsedSec = 0;
+    this.isRecPaused = false;
+    this.recCancelled = false;
+    this.autoDropAfterStop = false;
 
-    this.recTargetLineY = targetLineY;
-    this.recTargetX = typeof opts.x === 'number' ? opts.x : undefined;
-    this.recLineIndex = lineIndex;
+    const modal = document.getElementById('voiceNoteStudioModal');
+    const noteInput = document.getElementById('voiceStudioNoteInput');
+    const timerEl = document.getElementById('voiceStudioTimer');
+    const stateEl = document.getElementById('voiceStudioStateText');
+    const dotEl = document.getElementById('voiceStudioDot');
+    const startStopBtn = document.getElementById('voiceStudioStartStopBtn');
+    const startStopLbl = document.getElementById('voiceStudioStartStopLabel');
+    const pauseBtn = document.getElementById('voiceStudioPauseBtn');
+    const waveEl = document.getElementById('voiceStudioWave');
+
+    if (noteInput) noteInput.value = '';
+    if (timerEl) timerEl.textContent = '00:00';
+    if (stateEl) stateEl.textContent = 'Mikrofon Hazır — Kaydı Başlatın';
+    dotEl?.classList.remove('recording', 'ready');
+    startStopBtn?.classList.remove('is-recording');
+    if (startStopLbl) startStopLbl.textContent = 'Kaydı Başlat';
+    pauseBtn?.classList.add('hidden');
+    waveEl?.classList.remove('active', 'paused');
+
+    modal?.classList.remove('hidden');
+  }
+
+  closeVoiceStudioModal() {
+    if (this.isCurrentlyRecording()) {
+      this.cancelVoiceRecording();
+    }
+    document.getElementById('voiceNoteStudioModal')?.classList.add('hidden');
+  }
+
+  async startVoiceRecordingInModal() {
+    this.recordedAudioDataUrl = null;
+    this.recordedDurationSec = 0;
     this.recCancelled = false;
     this.isRecPaused = false;
     this.recElapsedSec = 0;
@@ -628,7 +712,7 @@ class TabNoteApp {
     if (window.AndroidVoiceBridge && typeof window.AndroidVoiceBridge.startNativeRecording === 'function') {
       window.onAndroidMicPermissionResult = (granted) => {
         if (granted) {
-          this.startVoiceRecording({ lineY: targetLineY, x: this.recTargetX, lineIndex });
+          this.startVoiceRecordingInModal();
         } else {
           this.showToast('Mikrofon izni reddedildi. Lütfen izin verip tekrar deneyin.');
         }
@@ -641,7 +725,7 @@ class TabNoteApp {
       }
       if (status === 'OK') {
         this.isNativeRecording = true;
-        this.activateRecordingUI(targetLineY, lineIndex);
+        this.activateModalRecordingUI();
         return;
       }
       this.showToast(`Mikrofon başlatılamadı (${status}).`);
@@ -686,75 +770,91 @@ class TabNoteApp {
 
         const reader = new FileReader();
         reader.onload = (ev) => {
-          this.engine.addAudioNoteToPage({
-            title: `Satır ${this.recLineIndex || 1}`,
-            durationSec: duration,
-            dataUrl: ev.target.result,
-            lineY: this.recTargetLineY,
-            x: this.recTargetX
-          });
-          this.showToast(`🎙️ Ses kaydı ${this.recLineIndex || 1}. satıra eklendi!`);
+          this.recordedAudioDataUrl = ev.target.result;
+          this.recordedDurationSec = duration;
+          this.setModalReadyState(duration);
+          if (this.autoDropAfterStop) {
+            this.autoDropAfterStop = false;
+            this.finalizeDropVoiceNoteToPage();
+          }
         };
         reader.readAsDataURL(audioBlob);
       };
 
       this.mediaRecorder.start(250);
-      this.activateRecordingUI(targetLineY, lineIndex);
+      this.activateModalRecordingUI();
     } catch (err) {
       console.warn('Mikrofon erişim hatası:', err);
       this.showToast('Mikrofona erişilemedi. Lütfen mikrofon iznini kontrol edin.');
     }
   }
 
-  activateRecordingUI(targetLineY, lineIndex) {
-    this.engine.activeRecordingLineY = targetLineY;
-    this.engine.activeRecordingTimeText = '00:00';
-    this.engine.renderDOMOverlays();
+  activateModalRecordingUI() {
+    const timerEl = document.getElementById('voiceStudioTimer');
+    const stateEl = document.getElementById('voiceStudioStateText');
+    const dotEl = document.getElementById('voiceStudioDot');
+    const startStopBtn = document.getElementById('voiceStudioStartStopBtn');
+    const startStopLbl = document.getElementById('voiceStudioStartStopLabel');
+    const pauseBtn = document.getElementById('voiceStudioPauseBtn');
+    const waveEl = document.getElementById('voiceStudioWave');
 
-    document.getElementById('voiceRecorderBar').classList.remove('hidden');
-    const btn = document.getElementById('voiceRecordBtn');
-    btn.classList.add('recording');
-    const lbl = document.getElementById('voiceRecordBtnLabel');
-    if (lbl) lbl.textContent = `⏹ Kaydı Bitir (Satır ${lineIndex})`;
-
-    document.getElementById('recStateLabel').textContent = `${lineIndex}. Satıra Ses Kaydediliyor...`;
-    document.getElementById('recPauseResumeBtn').textContent = '⏸ Duraklat';
-    document.getElementById('recTimerDisplay').textContent = '00:00';
+    if (timerEl) timerEl.textContent = '00:00';
+    if (stateEl) stateEl.textContent = 'Ses Kaydediliyor...';
+    dotEl?.classList.remove('ready');
+    dotEl?.classList.add('recording');
+    startStopBtn?.classList.add('is-recording');
+    if (startStopLbl) startStopLbl.textContent = '⏹ Kaydı Durdur';
+    if (pauseBtn) {
+      pauseBtn.classList.remove('hidden');
+      pauseBtn.textContent = '⏸ Duraklat';
+    }
+    waveEl?.classList.add('active');
+    waveEl?.classList.remove('paused');
 
     clearInterval(this.recTimerInterval);
     this.recTimerInterval = setInterval(() => {
       if (!this.isRecPaused) {
         this.recElapsedSec++;
         const formatted = this.engine.formatSeconds(this.recElapsedSec);
-        document.getElementById('recTimerDisplay').textContent = formatted;
-        this.engine.activeRecordingTimeText = formatted;
-        const lineTimerEl = this.engine.overlayLayer?.querySelector('.line-rec-timer');
-        if (lineTimerEl) {
-          lineTimerEl.textContent = `Satır ${lineIndex} • ${formatted}`;
-        }
+        if (timerEl) timerEl.textContent = formatted;
       }
     }, 1000);
+  }
 
-    this.showToast(`🎙️ ${lineIndex}. satıra ses kaydediliyor... Bitirmek için satırdaki ⏹ butonuna basın.`);
+  setModalReadyState(duration) {
+    const stateEl = document.getElementById('voiceStudioStateText');
+    const dotEl = document.getElementById('voiceStudioDot');
+    const startStopBtn = document.getElementById('voiceStudioStartStopBtn');
+    const startStopLbl = document.getElementById('voiceStudioStartStopLabel');
+    const pauseBtn = document.getElementById('voiceStudioPauseBtn');
+    const waveEl = document.getElementById('voiceStudioWave');
+
+    if (stateEl) stateEl.textContent = `✓ Ses Kaydedildi (${this.engine.formatSeconds(duration)}) — Sayfaya Düşürmeye Hazır`;
+    dotEl?.classList.remove('recording');
+    dotEl?.classList.add('ready');
+    startStopBtn?.classList.remove('is-recording');
+    if (startStopLbl) startStopLbl.textContent = 'Yeniden Kaydet';
+    pauseBtn?.classList.add('hidden');
+    waveEl?.classList.remove('active', 'paused');
   }
 
   togglePauseVoiceRecording() {
-    const pauseBtn = document.getElementById('recPauseResumeBtn');
-    const stateLabel = document.getElementById('recStateLabel');
-    const waveBars = document.getElementById('recWaveBars');
+    const pauseBtn = document.getElementById('voiceStudioPauseBtn');
+    const stateLabel = document.getElementById('voiceStudioStateText');
+    const waveBars = document.getElementById('voiceStudioWave');
 
     if (this.isNativeRecording && window.AndroidVoiceBridge) {
       if (!this.isRecPaused) {
         window.AndroidVoiceBridge.pauseNativeRecording?.();
         this.isRecPaused = true;
-        pauseBtn.textContent = '▶ Devam Et';
-        stateLabel.textContent = 'Kayıt Duraklatıldı';
+        if (pauseBtn) pauseBtn.textContent = '▶ Devam Et';
+        if (stateLabel) stateLabel.textContent = 'Kayıt Duraklatıldı';
         waveBars?.classList.add('paused');
       } else {
         window.AndroidVoiceBridge.resumeNativeRecording?.();
         this.isRecPaused = false;
-        pauseBtn.textContent = '⏸ Duraklat';
-        stateLabel.textContent = `${this.recLineIndex || 1}. Satıra Ses Kaydediliyor...`;
+        if (pauseBtn) pauseBtn.textContent = '⏸ Duraklat';
+        if (stateLabel) stateLabel.textContent = 'Ses Kaydediliyor...';
         waveBars?.classList.remove('paused');
       }
       return;
@@ -764,38 +864,32 @@ class TabNoteApp {
     if (this.mediaRecorder.state === 'recording') {
       this.mediaRecorder.pause();
       this.isRecPaused = true;
-      pauseBtn.textContent = '▶ Devam Et';
-      stateLabel.textContent = 'Kayıt Duraklatıldı';
+      if (pauseBtn) pauseBtn.textContent = '▶ Devam Et';
+      if (stateLabel) stateLabel.textContent = 'Kayıt Duraklatıldı';
       waveBars?.classList.add('paused');
     } else if (this.mediaRecorder.state === 'paused') {
       this.mediaRecorder.resume();
       this.isRecPaused = false;
-      pauseBtn.textContent = '⏸ Duraklat';
-      stateLabel.textContent = `${this.recLineIndex || 1}. Satıra Ses Kaydediliyor...`;
+      if (pauseBtn) pauseBtn.textContent = '⏸ Duraklat';
+      if (stateLabel) stateLabel.textContent = 'Ses Kaydediliyor...';
       waveBars?.classList.remove('paused');
     }
   }
 
-  stopAndSaveVoiceRecording() {
+  stopVoiceRecordingInModal(autoDrop = false) {
     clearInterval(this.recTimerInterval);
     const duration = Math.max(1, this.recElapsedSec || 1);
-    const lineY = this.recTargetLineY || this.engine.lastActiveLineY || 116;
-    const targetX = this.recTargetX;
-    const lineIndex = this.recLineIndex || 1;
 
     if (this.isNativeRecording && window.AndroidVoiceBridge) {
       this.isNativeRecording = false;
-      this.hideVoiceRecorderBar();
       const dataUrl = window.AndroidVoiceBridge.stopNativeRecording();
       if (dataUrl && dataUrl.startsWith('data:audio')) {
-        this.engine.addAudioNoteToPage({
-          title: `Satır ${lineIndex}`,
-          durationSec: duration,
-          dataUrl,
-          lineY,
-          x: targetX
-        });
-        this.showToast(`🎙️ Ses kaydı ${lineIndex}. satıra eklendi!`);
+        this.recordedAudioDataUrl = dataUrl;
+        this.recordedDurationSec = duration;
+        this.setModalReadyState(duration);
+        if (autoDrop) {
+          this.finalizeDropVoiceNoteToPage();
+        }
       } else {
         this.showToast('Ses kaydı tamamlanamadı.');
       }
@@ -804,15 +898,52 @@ class TabNoteApp {
 
     if (!this.mediaRecorder) return;
     this.recCancelled = false;
+    this.autoDropAfterStop = autoDrop;
     if (this.mediaRecorder.state !== 'inactive') {
       this.mediaRecorder.stop();
     }
-    this.hideVoiceRecorderBar();
+  }
+
+  dropVoiceAndNoteToPage() {
+    if (this.isCurrentlyRecording()) {
+      this.stopVoiceRecordingInModal(true);
+      return;
+    }
+    this.finalizeDropVoiceNoteToPage();
+  }
+
+  finalizeDropVoiceNoteToPage() {
+    const noteInput = document.getElementById('voiceStudioNoteInput');
+    const noteText = (noteInput?.value || '').trim();
+
+    if (this.recordedAudioDataUrl) {
+      const count = (this.engine.page?.audioNotes || []).length + 1;
+      this.engine.addAudioNoteToPage({
+        title: noteText || `Sesli Not ${count}`,
+        durationSec: this.recordedDurationSec || 1,
+        dataUrl: this.recordedAudioDataUrl
+      });
+      document.getElementById('voiceNoteStudioModal')?.classList.add('hidden');
+      this.recordedAudioDataUrl = null;
+      this.showToast('🎙️ Ses kaydı ve notunuz sayfaya eklendi! Üst çubuğundan tutup taşıyabilirsiniz.');
+      return;
+    }
+
+    if (noteText) {
+      const scrollY = this.engine.viewportEl ? this.engine.viewportEl.scrollTop / (this.engine.zoom || 1) : 0;
+      this.engine.createTextBoxAt(120, Math.max(80, Math.round(scrollY + 140)), noteText);
+      document.getElementById('voiceNoteStudioModal')?.classList.add('hidden');
+      this.showToast('📝 Notunuz sayfaya taşınabilir metin kutusu olarak eklendi!');
+      return;
+    }
+
+    this.showToast('Lütfen önce "Kaydı Başlat" butonuna basarak ses kaydedin veya bir not yazın.');
   }
 
   cancelVoiceRecording() {
     clearInterval(this.recTimerInterval);
     this.recCancelled = true;
+    this.autoDropAfterStop = false;
     if (this.isNativeRecording && window.AndroidVoiceBridge) {
       this.isNativeRecording = false;
       window.AndroidVoiceBridge.cancelNativeRecording?.();
@@ -821,8 +952,6 @@ class TabNoteApp {
       this.mediaRecorder.stop();
     }
     this.cleanupVoiceStream();
-    this.hideVoiceRecorderBar();
-    this.showToast('Ses kaydı iptal edildi.');
   }
 
   cleanupVoiceStream() {
@@ -831,17 +960,6 @@ class TabNoteApp {
       this.audioStream.getTracks().forEach((track) => track.stop());
       this.audioStream = null;
     }
-  }
-
-  hideVoiceRecorderBar() {
-    this.engine.activeRecordingLineY = null;
-    this.engine.renderDOMOverlays();
-    document.getElementById('voiceRecorderBar').classList.add('hidden');
-    const btn = document.getElementById('voiceRecordBtn');
-    btn.classList.remove('recording');
-    const lbl = document.getElementById('voiceRecordBtnLabel');
-    if (lbl) lbl.textContent = '🎙️ Satıra Kaydet';
-    document.getElementById('recWaveBars')?.classList.remove('paused');
   }
 
   /**
@@ -1082,6 +1200,236 @@ class TabNoteApp {
     });
   }
 
+  renderHomeScreen() {
+    this.renderHomeFoldersGrid();
+    this.renderHomeNotebooksGrid();
+  }
+
+  renderHomeFoldersGrid() {
+    const gridEl = document.getElementById('homeFoldersGrid');
+    const countBadge = document.getElementById('homeFolderCountBadge');
+    if (!gridEl) return;
+    gridEl.innerHTML = '';
+
+    if (countBadge) {
+      countBadge.textContent = `${this.folders.length} Klasör`;
+    }
+
+    for (const fld of this.folders) {
+      const count = this.getNotebooksForFolder(fld.id).length;
+      const isSelected = this.activeFolderId === fld.id;
+      const card = document.createElement('div');
+      card.className = `home-folder-card ${isSelected ? 'active' : ''}`;
+      card.style.setProperty('--fld-color', fld.color || '#3B82F6');
+
+      const iconSymbol = fld.id === 'all' ? '📚' : fld.id === 'favorites' ? '⭐' : '📁';
+
+      card.innerHTML = `
+        <div class="home-folder-card-top">
+          <div class="home-folder-icon-wrap" style="background:${fld.color}22; color:${fld.color}">
+            <span>${iconSymbol}</span>
+          </div>
+          ${
+            !fld.system
+              ? `<button type="button" class="home-folder-del-btn" title="Klasörü Sil">✕</button>`
+              : ''
+          }
+        </div>
+        <div class="home-folder-card-body">
+          <h3 class="home-folder-title">${this.escapeHtml(fld.name)}</h3>
+          <span class="home-folder-meta">${count} Not Defteri</span>
+        </div>
+      `;
+
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.home-folder-del-btn')) return;
+        this.activeFolderId = fld.id;
+        this.renderHomeScreen();
+        this.renderSidebar();
+      });
+
+      const delBtn = card.querySelector('.home-folder-del-btn');
+      if (delBtn) {
+        delBtn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          this.folders = this.folders.filter((f) => f.id !== fld.id);
+          await storage.saveFolders(this.folders);
+          if (this.activeFolderId === fld.id) {
+            this.activeFolderId = 'all';
+          }
+          this.renderHomeScreen();
+          this.renderSidebar();
+          this.showToast(`"${fld.name}" klasörü silindi.`);
+        });
+      }
+
+      gridEl.appendChild(card);
+    }
+
+    // Hızlı "+ Yeni Klasör" Kartı
+    const addFolderCard = document.createElement('button');
+    addFolderCard.type = 'button';
+    addFolderCard.className = 'home-folder-card add-new-folder-card';
+    addFolderCard.innerHTML = `
+      <div class="add-folder-plus">+</div>
+      <span>Yeni Klasör Oluştur</span>
+    `;
+    addFolderCard.addEventListener('click', () => {
+      this.promptCreateNewFolder();
+    });
+    gridEl.appendChild(addFolderCard);
+  }
+
+  renderHomeNotebooksGrid() {
+    const gridEl = document.getElementById('homeNotebooksGrid');
+    const titleEl = document.getElementById('homeNotebooksSectionTitle');
+    const countBadge = document.getElementById('homeNotebookCountBadge');
+    if (!gridEl) return;
+    gridEl.innerHTML = '';
+
+    const activeFldObj = this.folders.find((f) => f.id === this.activeFolderId) || this.folders[0];
+    if (titleEl && activeFldObj) {
+      titleEl.textContent = `Not Defterleri — ${activeFldObj.name}`;
+    }
+
+    let filtered = this.getNotebooksForFolder(this.activeFolderId);
+    if (this.homeSearchQuery) {
+      filtered = filtered.filter((nb) => {
+        const inTitle = (nb.title || '').toLowerCase().includes(this.homeSearchQuery);
+        const inText = (nb.pages || []).some((pg) =>
+          (pg.textBoxes || []).some((tb) =>
+            (tb.text || '').toLowerCase().includes(this.homeSearchQuery)
+          )
+        );
+        return inTitle || inText;
+      });
+    }
+
+    if (countBadge) {
+      countBadge.textContent = `${filtered.length} Defter`;
+    }
+
+    // 1. "+ Yeni Not Defteri Oluştur" Kartı
+    const createCard = document.createElement('button');
+    createCard.type = 'button';
+    createCard.className = 'home-notebook-create-card';
+    createCard.innerHTML = `
+      <div class="create-nb-circle">+</div>
+      <strong>Yeni Not Defteri</strong>
+      <span>${this.escapeHtml(activeFldObj?.name || 'Bu klasöre')} yeni defter aç</span>
+    `;
+    createCard.addEventListener('click', () => {
+      this.createNewNotebook(true);
+    });
+    gridEl.appendChild(createCard);
+
+    // 2. Mevcut Not Defteri Kapak Kartları
+    for (const nb of filtered) {
+      const card = document.createElement('div');
+      card.className = 'home-notebook-card';
+
+      const folderObj =
+        this.folders.find((f) => f.id === nb.folderId) ||
+        this.folders.find((f) => !f.system) ||
+        this.folders[0];
+
+      const dateStr = new Date(nb.updatedAt || Date.now()).toLocaleDateString('tr-TR', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      const previewWrap = document.createElement('div');
+      previewWrap.className = 'home-nb-preview-wrap';
+
+      const spine = document.createElement('div');
+      spine.className = 'home-nb-spine';
+      spine.style.background = nb.coverColor || folderObj?.color || '#2563EB';
+
+      const previewCanvas = document.createElement('canvas');
+      previewCanvas.width = 210;
+      previewCanvas.height = 289;
+      const pCtx = previewCanvas.getContext('2d');
+      const scale = 210 / PAGE_WIDTH;
+      pCtx.scale(scale, scale);
+
+      const firstPage = (nb.pages && nb.pages[0]) || { template: 'ruled', paperColor: 'ivory' };
+      const bgImg = this.engine?.bgImageCache?.get(firstPage.id) || null;
+      renderPaperBackground(
+        pCtx,
+        PAGE_WIDTH,
+        PAGE_HEIGHT,
+        firstPage.template || 'ruled',
+        firstPage.paperColor || 'ivory',
+        bgImg
+      );
+      if (this.engine) {
+        for (const st of firstPage.strokes || []) {
+          this.engine.drawStroke(pCtx, st);
+        }
+        for (const sh of firstPage.shapes || []) {
+          this.engine.drawGeometricShape(pCtx, sh);
+        }
+      }
+
+      const favBadgeBtn = document.createElement('button');
+      favBadgeBtn.type = 'button';
+      favBadgeBtn.className = `home-nb-fav-btn ${nb.favorite ? 'is-fav' : ''}`;
+      favBadgeBtn.textContent = '★';
+      favBadgeBtn.title = nb.favorite ? 'Favorilerden Çıkar' : 'Favorilere Ekle';
+      favBadgeBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        nb.favorite = !nb.favorite;
+        await storage.saveNotebook(nb);
+        this.renderHomeScreen();
+        this.renderSidebar();
+      });
+
+      previewWrap.append(spine, previewCanvas, favBadgeBtn);
+
+      const infoBody = document.createElement('div');
+      infoBody.className = 'home-nb-info';
+      infoBody.innerHTML = `
+        <div class="home-nb-title-row">
+          <h4 class="home-nb-title">${this.escapeHtml(nb.title || 'Adsız Not Defteri')}</h4>
+          <button type="button" class="home-nb-del-btn" title="Not Defterini Sil">🗑</button>
+        </div>
+        <div class="home-nb-meta-row">
+          <span class="home-nb-folder-chip" style="border-color:${folderObj?.color || '#3B82F6'}55">
+            ${this.escapeHtml(folderObj?.name || 'Genel')}
+          </span>
+          <span>${nb.pages?.length || 1} sayfa</span>
+          <span>• ${dateStr}</span>
+        </div>
+      `;
+
+      infoBody.querySelector('.home-nb-del-btn').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (this.notebooks.length <= 1) {
+          this.showToast('En az bir not defteri kalmalıdır.');
+          return;
+        }
+        await storage.deleteNotebook(nb.id);
+        this.notebooks = await storage.getAllNotebooks();
+        if (this.activeNotebook?.id === nb.id) {
+          this.activeNotebook = this.notebooks[0];
+        }
+        this.renderHomeScreen();
+        this.renderSidebar();
+        this.showToast('Not defteri silindi.');
+      });
+
+      card.append(previewWrap, infoBody);
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.home-nb-del-btn') || e.target.closest('.home-nb-fav-btn')) return;
+        this.openNotebookInEditor(nb);
+      });
+
+      gridEl.appendChild(card);
+    }
+  }
+
   renderSidebar() {
     const folderListEl = document.getElementById('folderListContainer');
     folderListEl.innerHTML = '';
@@ -1099,6 +1447,7 @@ class TabNoteApp {
       item.addEventListener('click', () => {
         this.activeFolderId = fld.id;
         this.renderSidebar();
+        if (this.isHomeView) this.renderHomeScreen();
       });
       folderListEl.appendChild(item);
     }
@@ -1137,7 +1486,7 @@ class TabNoteApp {
         </div>
       `;
       document.getElementById('emptyCreateNbBtn')?.addEventListener('click', () => {
-        this.createNewNotebook();
+        this.createNewNotebook(true);
       });
       return;
     }
@@ -1175,9 +1524,7 @@ class TabNoteApp {
 
       card.addEventListener('click', (e) => {
         if (e.target.closest('.nb-card-del-btn')) return;
-        this.activeNotebook = nb;
-        this.renderNotebookList();
-        this.loadActiveNotebookIntoWorkspace();
+        this.openNotebookInEditor(nb);
       });
 
       card.querySelector('.nb-card-del-btn').addEventListener('click', async (e) => {
@@ -1193,6 +1540,7 @@ class TabNoteApp {
           this.loadActiveNotebookIntoWorkspace();
         }
         this.renderSidebar();
+        this.renderHomeScreen();
         this.showToast('Not defteri silindi.');
       });
 
@@ -1283,7 +1631,7 @@ class TabNoteApp {
     });
   }
 
-  async createNewNotebook() {
+  async createNewNotebook(openInEditor = true) {
     const targetFolder =
       this.activeFolderId === 'all' || this.activeFolderId === 'favorites'
         ? 'study'
@@ -1319,7 +1667,10 @@ class TabNoteApp {
     this.notebooks = await storage.getAllNotebooks();
     this.activeNotebook = newNb;
     this.renderSidebar();
-    this.loadActiveNotebookIntoWorkspace();
+    this.renderHomeScreen();
+    if (openInEditor) {
+      this.openNotebookInEditor(newNb);
+    }
     this.showToast('Yeni not defteri açıldı.');
   }
 

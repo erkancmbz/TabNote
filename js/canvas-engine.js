@@ -1610,92 +1610,11 @@ export class CanvasEngine {
   }
 
   /**
-   * DOM Katmanı: Her Satır İçin Doğrudan 🎙️ Ses Kayıt Butonu, Satır İçi Ses Oynatıcıları, Görseller ve Metin Kutuları
+   * DOM Katmanı: Serbest Taşınabilir Ses & Not Kartları, Görseller, Dosya Kartları ve Metin Kutuları
    */
   renderDOMOverlays() {
     if (!this.overlayLayer || !this.page) return;
     this.overlayLayer.innerHTML = '';
-
-    // 0. HER SATIRIN SOL KENARINDA DOĞRUDAN "🎙️" SATIR SES KAYIT BUTONU
-    const lineRows = this.getPageLineRows();
-    const recordedLinesSet = new Set(
-      (this.page.audioNotes || []).map((a) => this.snapYToLine(a.lineY || a.y || 116))
-    );
-
-    for (const row of lineRows) {
-      const isCurrentlyRecordingThisLine =
-        this.activeRecordingLineY !== null &&
-        Math.abs(this.activeRecordingLineY - row.lineY) <= 8;
-
-      if (isCurrentlyRecordingThisLine) {
-        // Bu satırda şu an aktif ses kaydı yapılıyor! Satır üzerinde canlı kayıt kontrolü göster
-        const recPill = document.createElement('div');
-        recPill.className = 'line-active-recorder-pill';
-        recPill.style.left = '8px';
-        recPill.style.top = `${row.lineY - 27}px`;
-
-        const dot = document.createElement('span');
-        dot.className = 'line-rec-dot';
-
-        const timeSpan = document.createElement('span');
-        timeSpan.className = 'line-rec-timer';
-        timeSpan.textContent = `Satır ${row.index} • ${this.activeRecordingTimeText || '00:00'}`;
-
-        const stopBtn = document.createElement('button');
-        stopBtn.type = 'button';
-        stopBtn.className = 'line-rec-stop-btn';
-        stopBtn.textContent = '⏹ Bitir & Bu Satıra Ekle';
-        stopBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
-        stopBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.onLineVoiceStop();
-        });
-
-        const cancelBtn = document.createElement('button');
-        cancelBtn.type = 'button';
-        cancelBtn.className = 'line-rec-cancel-btn';
-        cancelBtn.textContent = '✕';
-        cancelBtn.title = 'Kaydı İptal Et';
-        cancelBtn.addEventListener('pointerdown', (e) => e.stopPropagation());
-        cancelBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.onLineVoiceCancel();
-        });
-
-        recPill.append(dot, timeSpan, stopBtn, cancelBtn);
-        this.overlayLayer.appendChild(recPill);
-      } else {
-        // Satırın sol marjında doğrudan kayıt başlatma butonu (🎙️)
-        const micBtn = document.createElement('button');
-        micBtn.type = 'button';
-        const hasAudioOnLine = recordedLinesSet.has(row.lineY);
-        const isLastActive = Math.abs((this.lastActiveLineY || 116) - row.lineY) <= 8;
-        micBtn.className = `line-mic-gutter-btn${hasAudioOnLine ? ' has-audio' : ''}${isLastActive ? ' is-current-line' : ''}`;
-        micBtn.style.left = '6px';
-        micBtn.style.top = `${row.lineY - 24}px`;
-        micBtn.title = `${row.index}. satıra doğrudan ses kaydı başlat`;
-        micBtn.innerHTML = `<span class="mic-ico">🎙️</span><span class="line-num">${row.index}</span>`;
-
-        micBtn.addEventListener('pointerdown', (e) => {
-          e.stopPropagation();
-        });
-        micBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          this.lastActiveLineY = row.lineY;
-          const existingOnLine = (this.page.audioNotes || []).filter(
-            (a) => Math.abs((a.lineY || a.y || 116) - row.lineY) <= 10
-          );
-          const nextX = Math.min(PAGE_WIDTH - 290, 92 + existingOnLine.length * 275);
-          this.onLineVoiceTrigger({
-            lineY: row.lineY,
-            x: nextX,
-            lineIndex: row.index
-          });
-        });
-
-        this.overlayLayer.appendChild(micBtn);
-      }
-    }
 
     // 1. Sayfa içi serbest görseller
     for (const imgObj of this.page.images) {
@@ -1744,27 +1663,51 @@ export class CanvasEngine {
       this.overlayLayer.appendChild(wrap);
     }
 
-    // 2. SATIR İÇİ SES KAYDI OYNATICILARI (O Satıra Eklenen Kompakt Ses Çubukları)
+    // 2. SERBEST TAŞINABİLİR SES VE NOT KARTLARI (Sayfa Üzerinde İstediğin Yere Sürüklenebilir)
     for (const audioObj of this.page.audioNotes || []) {
-      const snappedLineY = this.snapYToLine(audioObj.lineY || audioObj.y || 116);
-      const pill = document.createElement('div');
-      pill.className = 'line-audio-pill';
-      pill.style.left = `${audioObj.x || 92}px`;
-      pill.style.top = `${snappedLineY - 27}px`;
+      if (typeof audioObj.x !== 'number') audioObj.x = 110;
+      if (typeof audioObj.y !== 'number') {
+        audioObj.y = typeof audioObj.lineY === 'number' ? Math.max(40, audioObj.lineY - 24) : 120;
+      }
+
+      const card = document.createElement('div');
+      card.className = 'draggable-voice-card';
+      card.style.left = `${audioObj.x}px`;
+      card.style.top = `${audioObj.y}px`;
 
       const audioEl = new Audio(audioObj.dataUrl);
       audioEl.preload = 'metadata';
 
+      // Üst Taşıma Çubuğu
+      const headerBar = document.createElement('div');
+      headerBar.className = 'voice-card-header';
+
       const dragGrip = document.createElement('span');
-      dragGrip.className = 'line-audio-grip';
-      dragGrip.title = 'Satır üzerinde veya başka satıra sürükle';
-      dragGrip.textContent = '🎙️';
+      dragGrip.className = 'voice-card-grip';
+      dragGrip.title = 'Basılı tutup sayfa üzerinde istediğiniz yere taşıyın';
+      dragGrip.innerHTML = '⋮⋮ 🎙️ Sesli Not (Taşı)';
+
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'voice-card-del-btn';
+      delBtn.textContent = '✕';
+      delBtn.title = 'Ses kaydını sil';
+
+      headerBar.append(dragGrip, delBtn);
+
+      // Oynatıcı Kontrolleri Satırı
+      const playerRow = document.createElement('div');
+      playerRow.className = 'voice-card-player-row';
 
       const playBtn = document.createElement('button');
       playBtn.type = 'button';
       playBtn.className = 'line-audio-play-btn';
       playBtn.textContent = '▶';
       playBtn.title = 'Oynat / Duraklat';
+
+      const timeLabel = document.createElement('span');
+      timeLabel.className = 'line-audio-time';
+      timeLabel.textContent = this.formatSeconds(audioObj.durationSec || 0);
 
       const seekSlider = document.createElement('input');
       seekSlider.type = 'range';
@@ -1773,31 +1716,24 @@ export class CanvasEngine {
       seekSlider.max = '100';
       seekSlider.value = '0';
 
-      const timeLabel = document.createElement('span');
-      timeLabel.className = 'line-audio-time';
-      timeLabel.textContent = this.formatSeconds(audioObj.durationSec || 0);
-
       const speedBtn = document.createElement('button');
       speedBtn.type = 'button';
       speedBtn.className = 'line-audio-speed';
       speedBtn.textContent = '1x';
 
-      const titleInput = document.createElement('input');
-      titleInput.type = 'text';
-      titleInput.className = 'line-audio-label-input';
-      titleInput.value = audioObj.title || '';
-      titleInput.placeholder = 'Not...';
-      titleInput.addEventListener('pointerdown', (e) => e.stopPropagation());
-      titleInput.addEventListener('input', () => {
-        audioObj.title = titleInput.value;
+      playerRow.append(playBtn, timeLabel, seekSlider, speedBtn);
+
+      // Ses Kaydı Notu / Açıklaması Alanı
+      const noteInput = document.createElement('input');
+      noteInput.type = 'text';
+      noteInput.className = 'voice-card-note-input';
+      noteInput.value = audioObj.title || '';
+      noteInput.placeholder = 'Ses kaydı notu yazın...';
+      noteInput.addEventListener('pointerdown', (e) => e.stopPropagation());
+      noteInput.addEventListener('input', () => {
+        audioObj.title = noteInput.value;
         this.onChange();
       });
-
-      const delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.className = 'line-audio-del-btn';
-      delBtn.textContent = '✕';
-      delBtn.title = 'Bu satırdaki ses kaydını sil';
 
       const speeds = [1, 1.5, 2];
       let speedIdx = 0;
@@ -1815,11 +1751,11 @@ export class CanvasEngine {
         if (audioEl.paused) {
           audioEl.play().catch(() => {});
           playBtn.textContent = '⏸';
-          pill.classList.add('playing');
+          card.classList.add('playing');
         } else {
           audioEl.pause();
           playBtn.textContent = '▶';
-          pill.classList.remove('playing');
+          card.classList.remove('playing');
         }
       };
 
@@ -1835,7 +1771,7 @@ export class CanvasEngine {
       audioEl.addEventListener('ended', () => {
         playBtn.textContent = '▶';
         seekSlider.value = '0';
-        pill.classList.remove('playing');
+        card.classList.remove('playing');
         timeLabel.textContent = this.formatSeconds(audioObj.durationSec || 0);
       });
 
@@ -1858,14 +1794,14 @@ export class CanvasEngine {
         this.onChange();
       };
 
-      pill.append(dragGrip, playBtn, timeLabel, seekSlider, speedBtn, titleInput, delBtn);
+      card.append(headerBar, playerRow, noteInput);
 
-      this.makeLineAudioDraggable(dragGrip, pill, audioObj, () => {
-        this.renderDOMOverlays();
+      // Kartı üst çubuğundan (headerBar) tutarak sayfanın her yerine serbestçe taşıyabilme
+      this.makeElementDraggable(headerBar, card, audioObj, () => {
         this.onChange();
       });
 
-      this.overlayLayer.appendChild(pill);
+      this.overlayLayer.appendChild(card);
     }
 
     // 3. Sayfaya Eklenen Dosya Kartları (Attachments)
@@ -1935,17 +1871,6 @@ export class CanvasEngine {
       const actions = document.createElement('div');
       actions.className = 'textbox-mini-actions';
 
-      const voiceLineBtn = document.createElement('button');
-      voiceLineBtn.type = 'button';
-      voiceLineBtn.textContent = '🎙️ Ses Kaydet';
-      voiceLineBtn.title = 'Bu satıra doğrudan ses kaydet';
-      voiceLineBtn.onclick = (e) => {
-        e.stopPropagation();
-        const lineY = this.snapYToLine(tb.y + 24);
-        this.lastActiveLineY = lineY;
-        this.onLineVoiceTrigger({ lineY, x: Math.min(PAGE_WIDTH - 290, tb.x + 180) });
-      };
-
       const fontDownBtn = document.createElement('button');
       fontDownBtn.type = 'button';
       fontDownBtn.textContent = 'A-';
@@ -1984,7 +1909,7 @@ export class CanvasEngine {
         this.onChange();
       };
 
-      actions.append(voiceLineBtn, fontDownBtn, fontUpBtn, boldBtn, delBtn);
+      actions.append(fontDownBtn, fontUpBtn, boldBtn, delBtn);
       bar.append(dragHandle, actions);
 
       const editor = document.createElement('div');
@@ -1997,13 +1922,8 @@ export class CanvasEngine {
       editor.style.color = tb.color || this.color;
       editor.style.fontWeight = tb.bold ? '700' : '400';
 
-      editor.addEventListener('focus', () => {
-        this.lastActiveLineY = this.snapYToLine(tb.y + 24);
-      });
-
       editor.addEventListener('input', () => {
         tb.text = editor.innerText;
-        this.lastActiveLineY = this.snapYToLine(tb.y + 24);
         this.onChange();
       });
 
@@ -2014,49 +1934,6 @@ export class CanvasEngine {
     }
   }
 
-  makeLineAudioDraggable(handleEl, pillEl, audioModel, onSave) {
-    let dragging = false;
-    let startX = 0;
-    let startY = 0;
-    let origX = 0;
-    let origLineY = 0;
-
-    handleEl.addEventListener('pointerdown', (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      this.pushUndoSnapshot();
-      dragging = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      origX = audioModel.x || 92;
-      origLineY = this.snapYToLine(audioModel.lineY || audioModel.y || 116);
-      try {
-        handleEl.setPointerCapture(e.pointerId);
-      } catch {}
-    });
-
-    handleEl.addEventListener('pointermove', (e) => {
-      if (!dragging) return;
-      const dx = (e.clientX - startX) / this.zoom;
-      const dy = (e.clientY - startY) / this.zoom;
-      audioModel.x = Math.max(88, Math.min(PAGE_WIDTH - 260, Math.round(origX + dx)));
-      const snappedY = this.snapYToLine(origLineY + dy);
-      audioModel.lineY = snappedY;
-      audioModel.y = snappedY - 27;
-      pillEl.style.left = `${audioModel.x}px`;
-      pillEl.style.top = `${snappedY - 27}px`;
-    });
-
-    handleEl.addEventListener('pointerup', (e) => {
-      if (!dragging) return;
-      dragging = false;
-      try {
-        handleEl.releasePointerCapture(e.pointerId);
-      } catch {}
-      onSave();
-    });
-  }
-
   formatSeconds(sec) {
     const s = Math.max(0, Math.round(sec || 0));
     const m = Math.floor(s / 60);
@@ -2064,31 +1941,26 @@ export class CanvasEngine {
     return `${String(m).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
   }
 
-  addAudioNoteToPage({ title, durationSec, dataUrl, lineY, x }) {
+  addAudioNoteToPage({ title, durationSec, dataUrl, x, y }) {
     if (!this.page) return;
     this.pushUndoSnapshot();
     if (!this.page.audioNotes) this.page.audioNotes = [];
-    const targetLineY = this.snapYToLine(lineY || this.lastActiveLineY || 116);
-    const existingOnLine = this.page.audioNotes.filter(
-      (a) => Math.abs((a.lineY || a.y || 116) - targetLineY) <= 10
-    );
-    const targetX =
-      typeof x === 'number'
-        ? x
-        : Math.min(PAGE_WIDTH - 280, 92 + existingOnLine.length * 270);
+    const count = this.page.audioNotes.length;
 
-    const rows = this.getPageLineRows();
-    const rowObj = rows.find((r) => Math.abs(r.lineY - targetLineY) <= 8);
-    const rowNum = rowObj ? rowObj.index : 1;
+    const currentScrollTop = this.viewportEl ? this.viewportEl.scrollTop / (this.zoom || 1) : 0;
+    const defaultX = typeof x === 'number' ? x : Math.min(PAGE_WIDTH - 340, 120 + (count % 3) * 36);
+    const defaultY =
+      typeof y === 'number'
+        ? y
+        : Math.min(PAGE_HEIGHT - 140, Math.max(60, Math.round(currentScrollTop + 140 + (count % 5) * 48)));
 
     this.page.audioNotes.push({
       id: `aud-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-      title: title || `Satır ${rowNum}`,
+      title: title || `Sesli Not ${count + 1}`,
       durationSec: durationSec || 0,
       dataUrl,
-      lineY: targetLineY,
-      x: targetX,
-      y: targetLineY - 27
+      x: defaultX,
+      y: defaultY
     });
     this.renderDOMOverlays();
     this.onChange();

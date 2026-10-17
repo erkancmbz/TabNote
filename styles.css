@@ -2049,150 +2049,749 @@ button {
   color: #FCD34D;
 }
 
-/* HER SATIRDA DOĞRUDAN SES KAYIT BUTONU (SOL MARJ) VE SATIR İÇİ SES OYNATICI */
-.line-mic-gutter-btn {
+/* ============================================================================
+   ANA EKRAN (HOME SCREEN): KLASÖRLER VE NOT DEFTERLERİ VİTRİNİ
+   ============================================================================ */
+.home-screen-view {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(37, 99, 235, 0.14), transparent 48%),
+    radial-gradient(circle at 85% 10%, rgba(16, 185, 129, 0.08), transparent 45%),
+    var(--bg-desk);
+  overflow: hidden;
+}
+
+.home-topbar {
+  min-height: 74px;
+  padding: 14px 28px;
+  background: rgba(28, 31, 38, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-hairline);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  z-index: 20;
+}
+
+.home-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.home-title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.home-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.home-search-bar {
+  flex: 1;
+  max-width: 480px;
+  min-width: 220px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.home-search-bar .search-icon {
   position: absolute;
-  pointer-events: auto;
-  height: 22px;
-  min-width: 44px;
-  padding: 0 6px;
+  left: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.home-search-bar input {
+  width: 100%;
+  height: 42px;
+  padding: 0 16px 0 42px;
   border-radius: 99px;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.28);
-  color: #DC2626;
-  font-size: 10px;
+  background: var(--bg-desk);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.home-search-bar input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.home-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-btn-secondary,
+.home-btn-primary {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 13px;
   font-weight: 700;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 3px;
-  opacity: 0.58;
-  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
-  user-select: none;
-  z-index: 12;
-}
-
-.line-mic-gutter-btn:hover,
-.line-mic-gutter-btn:active,
-.line-mic-gutter-btn.is-current-line {
-  opacity: 1;
-  background: rgba(239, 68, 68, 0.18);
-  border-color: #EF4444;
-  transform: scale(1.04);
-}
-
-.line-mic-gutter-btn.has-audio {
-  opacity: 0.95;
-  background: rgba(37, 99, 235, 0.16);
-  border-color: #3B82F6;
-  color: #1D4ED8;
-}
-
-.line-mic-gutter-btn .mic-ico {
-  font-size: 11px;
-  line-height: 1;
-}
-
-.line-mic-gutter-btn .line-num {
-  font-variant-numeric: tabular-nums;
-}
-
-/* Satır Üzerinde Canlı Kayıt Yapılırken Çıkan Aktif Kapsül */
-.line-active-recorder-pill {
-  position: absolute;
-  pointer-events: auto;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 99px;
-  background: #0F172A;
-  border: 1.5px solid #EF4444;
-  color: #FFFFFF;
-  display: inline-flex;
-  align-items: center;
   gap: 8px;
-  box-shadow: 0 6px 18px rgba(239, 68, 68, 0.4);
-  z-index: 30;
+  transition: transform 0.12s ease, background 0.15s ease;
 }
 
-.line-rec-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #EF4444;
-  box-shadow: 0 0 8px #EF4444;
-  animation: recDotBlink 0.9s infinite ease-in-out;
+.home-btn-secondary {
+  background: var(--bg-chrome-elevated);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
 }
 
-.line-rec-timer {
-  font-size: 11.5px;
-  font-weight: 800;
-  color: #FCA5A5;
-  font-variant-numeric: tabular-nums;
+.home-btn-secondary:hover {
+  background: var(--bg-chrome-hover);
 }
 
-.line-rec-stop-btn {
-  padding: 3px 9px;
-  border-radius: 99px;
-  background: #10B981;
+.home-btn-primary {
+  background: linear-gradient(135deg, #2563EB, #1D4ED8);
   color: #FFFFFF;
-  font-size: 11px;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+}
+
+.home-btn-primary:hover {
+  transform: translateY(-1px);
+}
+
+.home-content-scroll {
+  flex: 1 1 0%;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 26px 28px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.home-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.home-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.home-section-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-section-icon {
+  font-size: 20px;
+}
+
+.home-section-title-group h2 {
+  font-size: 17px;
   font-weight: 800;
+  color: var(--text-primary);
 }
 
-.line-rec-stop-btn:hover {
-  background: #059669;
+.home-count-pill {
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--bg-chrome-elevated);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 700;
 }
 
-.line-rec-cancel-btn {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: rgba(239, 68, 68, 0.22);
+/* KLASÖRLER IZGARASI */
+.home-folders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+  gap: 14px;
+}
+
+.home-folder-card {
+  position: relative;
+  padding: 15px 16px;
+  border-radius: 14px;
+  background: var(--bg-chrome);
+  border: 1.5px solid var(--border-hairline);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.home-folder-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--border-strong);
+  background: var(--bg-chrome-elevated);
+}
+
+.home-folder-card.active {
+  border-color: var(--fld-color, #3B82F6);
+  background: rgba(59, 130, 246, 0.1);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+}
+
+.home-folder-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.home-folder-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+}
+
+.home-folder-del-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-folder-del-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
   color: #FCA5A5;
-  font-size: 11px;
+}
+
+.home-folder-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.home-folder-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.home-folder-card.add-new-folder-card {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: rgba(255, 255, 255, 0.02);
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--text-secondary);
+  min-height: 108px;
+}
+
+.home-folder-card.add-new-folder-card:hover {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.add-folder-plus {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--bg-chrome-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+/* NOT DEFTERLERİ KAPAK VİTRİNİ (BOOKSHELF GRID) */
+.home-notebooks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 20px;
+}
+
+.home-notebook-create-card {
+  min-height: 310px;
+  border-radius: 16px;
+  border: 2px dashed var(--border-strong);
+  background: rgba(28, 31, 38, 0.55);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  text-align: center;
+  color: var(--text-primary);
+  transition: border-color 0.16s ease, background 0.16s ease, transform 0.16s ease;
+}
+
+.home-notebook-create-card:hover {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.09);
+  transform: translateY(-3px);
+}
+
+.create-nb-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(59, 130, 246, 0.18);
+  border: 1.5px solid #3B82F6;
+  color: #60A5FA;
+  font-size: 28px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* O Satıra Kaydedilen Kompakt Satır İçi Ses Oynatıcısı */
-.line-audio-pill {
+.home-notebook-create-card strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.home-notebook-create-card span {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.home-notebook-card {
+  border-radius: 16px;
+  background: var(--bg-chrome);
+  border: 1px solid var(--border-hairline);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.32);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.home-notebook-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--accent-primary);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.48);
+}
+
+.home-nb-preview-wrap {
+  position: relative;
+  height: 235px;
+  background: #0F1319;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 14px 14px 22px;
+  overflow: hidden;
+}
+
+.home-nb-spine {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  z-index: 2;
+}
+
+.home-nb-preview-wrap canvas {
+  height: 100%;
+  width: auto;
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+}
+
+.home-nb-fav-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.75);
+  color: #64748B;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3;
+}
+
+.home-nb-fav-btn.is-fav {
+  color: #FACC15;
+}
+
+.home-nb-info {
+  padding: 13px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.home-nb-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.home-nb-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-nb-del-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.home-nb-del-btn:hover {
+  background: rgba(239, 68, 68, 0.16);
+  color: #FCA5A5;
+}
+
+.home-nb-meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-secondary);
+}
+
+.home-nb-folder-chip {
+  padding: 1px 7px;
+  border-radius: 99px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-desk);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* EDİTÖR ÜST ÇUBUĞU: ANA EKRANA DÖN BUTONU */
+.back-home-btn {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: var(--bg-chrome-elevated);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-size: 12.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.back-home-btn:hover {
+  background: var(--bg-chrome-hover);
+  border-color: var(--accent-primary);
+}
+
+/* KALEM İSTASYONU İÇİNDEKİ "SES & NOT" ARACI BUTONU */
+.tool-dock-btn.voice-dock-trigger {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.tool-dock-btn.voice-dock-trigger:hover {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: #EF4444;
+}
+
+/* ============================================================================
+   MİKROFON, SES VE NOT KAYDET AÇILIŞ EKRANI (MODAL)
+   ============================================================================ */
+.voice-studio-dialog {
+  max-width: 480px;
+}
+
+.voice-studio-body {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.voice-studio-visualizer {
+  padding: 22px 18px;
+  border-radius: 16px;
+  background: #0F172A;
+  border: 1px solid #1E293B;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.voice-studio-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voice-studio-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #64748B;
+}
+
+.voice-studio-dot.recording {
+  background: #EF4444;
+  box-shadow: 0 0 10px #EF4444;
+  animation: recDotBlink 0.9s infinite ease-in-out;
+}
+
+.voice-studio-dot.ready {
+  background: #10B981;
+  box-shadow: 0 0 10px #10B981;
+}
+
+.voice-studio-state {
+  font-size: 13px;
+  font-weight: 700;
+  color: #E2E8F0;
+}
+
+.voice-studio-timer {
+  font-size: 36px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #F8FAFC;
+  letter-spacing: 0.03em;
+}
+
+.voice-studio-wave {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+}
+
+.voice-studio-wave span {
+  width: 4px;
+  height: 8px;
+  border-radius: 99px;
+  background: #475569;
+  transition: height 0.2s ease, background 0.2s ease;
+}
+
+.voice-studio-wave.active span {
+  background: #EF4444;
+  animation: recWaveBounce 0.75s infinite ease-in-out alternate;
+}
+
+.voice-studio-wave.active span:nth-child(2n) {
+  animation-delay: 0.15s;
+}
+.voice-studio-wave.active span:nth-child(3n) {
+  animation-delay: 0.3s;
+}
+
+.voice-studio-wave.paused span {
+  animation-play-state: paused;
+  opacity: 0.45;
+}
+
+.voice-studio-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.voice-main-rec-btn {
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 99px;
+  background: #EF4444;
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+  transition: transform 0.14s ease, background 0.14s ease;
+}
+
+.voice-main-rec-btn:hover {
+  background: #DC2626;
+  transform: scale(1.02);
+}
+
+.voice-main-rec-btn.is-recording {
+  background: #F59E0B;
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+}
+
+.voice-sec-btn {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 99px;
+  background: #1E293B;
+  border: 1px solid #334155;
+  color: #F8FAFC;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.voice-studio-note-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.voice-studio-note-field label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.voice-studio-note-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--bg-desk);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 13.5px;
+  resize: vertical;
+  outline: none;
+}
+
+.voice-studio-note-field textarea:focus {
+  border-color: var(--accent-primary);
+}
+
+.voice-studio-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.voice-drop-btn {
+  padding: 10px 18px;
+  font-size: 13.5px;
+  background: #10B981;
+}
+
+.voice-drop-btn:hover {
+  background: #059669;
+}
+
+/* ============================================================================
+   SAYFA ÜZERİNDE SERBEST TAŞINABİLİR SES VE NOT KARTI (.draggable-voice-card)
+   ============================================================================ */
+.draggable-voice-card {
   position: absolute;
   pointer-events: auto;
-  height: 26px;
-  padding: 0 7px;
-  border-radius: 99px;
+  width: 300px;
+  border-radius: 12px;
   background: #0F172A;
   color: #F8FAFC;
   border: 1.5px solid #3B82F6;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.25);
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.35);
   z-index: 18;
   user-select: none;
+  overflow: hidden;
 }
 
-.line-audio-pill.playing {
+.draggable-voice-card.playing {
   border-color: #10B981;
-  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.28);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25), 0 10px 26px rgba(15, 23, 42, 0.35);
 }
 
-.line-audio-grip {
+.voice-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: #1E293B;
+  border-bottom: 1px solid #334155;
   cursor: grab;
   touch-action: none;
-  font-size: 11px;
-  padding: 0 2px;
 }
 
-.line-audio-play-btn {
+.voice-card-header:active {
+  cursor: grabbing;
+}
+
+.voice-card-grip {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #93C5FD;
+  letter-spacing: 0.01em;
+}
+
+.voice-card-del-btn {
   width: 20px;
   height: 20px;
   border-radius: 50%;
+  background: rgba(239, 68, 68, 0.2);
+  color: #FCA5A5;
+  font-size: 10.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.voice-card-del-btn:hover {
+  background: #EF4444;
+  color: #FFFFFF;
+}
+
+.voice-card-player-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.line-audio-play-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
   background: #3B82F6;
   color: #FFFFFF;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 800;
   display: flex;
   align-items: center;
@@ -2200,67 +2799,49 @@ button {
   flex-shrink: 0;
 }
 
-.line-audio-pill.playing .line-audio-play-btn {
+.draggable-voice-card.playing .line-audio-play-btn {
   background: #10B981;
 }
 
 .line-audio-time {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   color: #93C5FD;
-  min-width: 32px;
+  min-width: 36px;
 }
 
 .line-audio-slider {
-  width: 68px;
+  flex: 1;
   height: 4px;
   accent-color: #3B82F6;
   cursor: pointer;
 }
 
 .line-audio-speed {
-  padding: 1px 5px;
+  padding: 2px 6px;
   border-radius: 99px;
   background: #1E293B;
   border: 1px solid #334155;
   color: #E2E8F0;
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 700;
 }
 
-.line-audio-label-input {
-  width: 62px;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid transparent;
-  border-radius: 4px;
+.voice-card-note-input {
+  width: 100%;
+  border: none;
+  border-top: 1px solid #1E293B;
+  background: rgba(15, 23, 42, 0.85);
   color: #F8FAFC;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
-  padding: 1px 4px;
+  padding: 7px 10px;
   outline: none;
 }
 
-.line-audio-label-input:focus {
-  border-color: #60A5FA;
+.voice-card-note-input:focus {
   background: #1E293B;
-}
-
-.line-audio-del-btn {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: rgba(239, 68, 68, 0.18);
-  color: #FCA5A5;
-  font-size: 10px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.line-audio-del-btn:hover {
-  background: #EF4444;
   color: #FFFFFF;
 }
 
