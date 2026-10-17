@@ -2829,6 +2829,7 @@ button {
 .draggable-voice-card {
   position: absolute;
   pointer-events: auto;
+  touch-action: none;
   width: 300px;
   border-radius: 12px;
   background: #0F172A;

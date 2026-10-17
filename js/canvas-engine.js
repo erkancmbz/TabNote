@@ -312,6 +312,7 @@ export class CanvasEngine {
 
   bindEvents() {
     const surface = this.liveCanvas;
+    this.isOverlayDragging = false;
 
     surface.addEventListener('pointerdown', (e) => this.handlePointerDown(e));
     surface.addEventListener('pointermove', (e) => this.handlePointerMove(e));
@@ -319,6 +320,7 @@ export class CanvasEngine {
     surface.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
 
     this.viewportEl.addEventListener('pointerdown', (e) => {
+      if (this.isOverlayDragging || this.selectionDragMode || this.isDrawing) return;
       if (
         e.target === this.viewportEl ||
         e.target === this.pageWrapperEl ||
@@ -336,6 +338,11 @@ export class CanvasEngine {
     });
 
     window.addEventListener('pointermove', (e) => {
+      if (this.isOverlayDragging || this.selectionDragMode || this.isDrawing) {
+        this.isPanning = false;
+        this.touchPanStart = null;
+        return;
+      }
       if (this.isPanning && e.pointerId === this.activePointerId && this.panStart) {
         const dx = e.clientX - this.panStart.x;
         const dy = e.clientY - this.panStart.y;
@@ -355,10 +362,46 @@ export class CanvasEngine {
     this.viewportEl.addEventListener(
       'touchstart',
       (e) => {
+        // Sesli not kartı, görsel, metin kutusu, dosya kartı veya kement çubuğu tutuluyorsa sayfayı ASLA kaydırma
+        if (
+          this.isOverlayDragging ||
+          this.selectionDragMode ||
+          e.target.closest(
+            '.draggable-voice-card, .canvas-image-item, .canvas-textbox-item, .canvas-attachment-card, .lasso-action-bar'
+          )
+        ) {
+          this.touchPanStart = null;
+          this.isPanning = false;
+          return;
+        }
+
         if (e.touches.length === 1) {
+          const t = e.touches[0];
+
+          // Kement (Lasso) seçimi kutusu içindeyse veya Kement aracı seçiliyse sayfayı kaydırma!
+          if (this.penActive) {
+            if (this.tool === 'lasso') {
+              this.touchPanStart = null;
+              return;
+            }
+            if (this.selection && this.selection.bounds) {
+              const pt = this.getCanvasCoords(t.clientX, t.clientY);
+              const b = this.selection.bounds;
+              const pad = 24;
+              if (
+                pt.x >= b.x - pad &&
+                pt.x <= b.x + b.w + pad &&
+                pt.y >= b.y - pad &&
+                pt.y <= b.y + b.h + pad
+              ) {
+                this.touchPanStart = null;
+                return;
+              }
+            }
+          }
+
           const shouldPan = !this.penActive || this.tool === 'pan' || this.fingerScrollMode;
           if (shouldPan) {
-            const t = e.touches[0];
             this.touchPanStart = {
               x: t.clientX,
               y: t.clientY,
@@ -378,7 +421,17 @@ export class CanvasEngine {
     this.viewportEl.addEventListener(
       'touchmove',
       (e) => {
-        if (this.touchPanStart && e.touches.length === 1 && !this.isDrawing) {
+        if (
+          this.isOverlayDragging ||
+          this.selectionDragMode ||
+          this.isDrawing ||
+          (this.penActive && this.tool === 'lasso')
+        ) {
+          this.touchPanStart = null;
+          if (e.cancelable) e.preventDefault();
+          return;
+        }
+        if (this.touchPanStart && e.touches.length === 1) {
           const t = e.touches[0];
           const dx = t.clientX - this.touchPanStart.x;
           const dy = t.clientY - this.touchPanStart.y;
@@ -426,7 +479,7 @@ export class CanvasEngine {
   }
 
   handlePointerDown(e) {
-    if (!this.page) return;
+    if (!this.page || this.isOverlayDragging) return;
 
     this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
 
@@ -434,6 +487,7 @@ export class CanvasEngine {
     if (this.activePointers.size >= 2) {
       this.cancelCurrentStroke();
       this.isPanning = false;
+      this.touchPanStart = null;
       const pts = Array.from(this.activePointers.values());
       this.initialPinchDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       this.initialPinchZoom = this.zoom;
@@ -458,18 +512,53 @@ export class CanvasEngine {
       return;
     }
 
-    // DURUM 3: "Parmak Kaydırır" aktifse ve ekrana parmakla (touch) dokunulduysa -> Sayfayı kaydırır, çizmez!
-    if (this.fingerScrollMode && e.pointerType === 'touch') {
+    const pt = this.getCanvasCoords(e.clientX, e.clientY);
+
+    // ÖNCELİK: Aktif bir Kement (Lasso) seçimi varsa, parmakla veya kalemle seçim kutusunun içinden tutup taşımaya izin ver (sayfa kaymasın!)
+    if (this.selection && this.selection.bounds) {
+      const b = this.selection.bounds;
+      const handleSize = 24;
+      if (
+        Math.abs(pt.x - (b.x + b.w)) <= handleSize &&
+        Math.abs(pt.y - (b.y + b.h)) <= handleSize
+      ) {
+        this.touchPanStart = null;
+        this.isPanning = false;
+        try {
+          this.liveCanvas.setPointerCapture(e.pointerId);
+        } catch {}
+        this.pushUndoSnapshot();
+        this.selectionDragMode = 'scale';
+        this.selectionDragStart = { x: pt.x, y: pt.y, origBounds: { ...b } };
+        this.activePointerId = e.pointerId;
+        return;
+      }
+      if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) {
+        this.touchPanStart = null;
+        this.isPanning = false;
+        try {
+          this.liveCanvas.setPointerCapture(e.pointerId);
+        } catch {}
+        this.pushUndoSnapshot();
+        this.selectionDragMode = 'move';
+        this.selectionDragStart = { x: pt.x, y: pt.y, lastX: pt.x, lastY: pt.y };
+        this.activePointerId = e.pointerId;
+        return;
+      }
+      this.clearSelection();
+    }
+
+    // DURUM 3: "Parmak Kaydırır" aktifse ve ekrana parmakla (touch) dokunulduysa -> (Kement aracı hariç) sayfayı kaydırır!
+    if (this.fingerScrollMode && e.pointerType === 'touch' && this.tool !== 'lasso') {
       this.startPanGesture(e);
       return;
     }
 
     this.touchPanStart = null;
+    this.isPanning = false;
     try {
       this.liveCanvas.setPointerCapture(e.pointerId);
     } catch {}
-
-    const pt = this.getCanvasCoords(e.clientX, e.clientY);
 
     if (this.tool === 'voice') {
       const snappedLineY = this.snapYToLine(pt.y);
@@ -483,29 +572,6 @@ export class CanvasEngine {
       this.lastActiveLineY = this.snapYToLine(pt.y);
       this.createTextBoxAt(pt.x, pt.y);
       return;
-    }
-
-    if (this.selection && this.selection.bounds) {
-      const b = this.selection.bounds;
-      const handleSize = 20;
-      if (
-        Math.abs(pt.x - (b.x + b.w)) <= handleSize &&
-        Math.abs(pt.y - (b.y + b.h)) <= handleSize
-      ) {
-        this.pushUndoSnapshot();
-        this.selectionDragMode = 'scale';
-        this.selectionDragStart = { x: pt.x, y: pt.y, origBounds: { ...b } };
-        this.activePointerId = e.pointerId;
-        return;
-      }
-      if (pt.x >= b.x && pt.x <= b.x + b.w && pt.y >= b.y && pt.y <= b.y + b.h) {
-        this.pushUndoSnapshot();
-        this.selectionDragMode = 'move';
-        this.selectionDragStart = { x: pt.x, y: pt.y, lastX: pt.x, lastY: pt.y };
-        this.activePointerId = e.pointerId;
-        return;
-      }
-      this.clearSelection();
     }
 
     this.tempBarrelEraser = e.pointerType === 'pen' && (e.buttons === 32 || e.button === 5);
@@ -552,6 +618,7 @@ export class CanvasEngine {
   }
 
   handlePointerMove(e) {
+    if (this.isOverlayDragging) return;
     if (this.activePointers.has(e.pointerId)) {
       this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
     }
@@ -574,15 +641,9 @@ export class CanvasEngine {
       return;
     }
 
-    if (this.isPanning && e.pointerId === this.activePointerId) {
-      const dx = e.clientX - this.panStart.x;
-      const dy = e.clientY - this.panStart.y;
-      this.viewportEl.scrollLeft = this.panStart.scrollLeft - dx;
-      this.viewportEl.scrollTop = this.panStart.scrollTop - dy;
-      return;
-    }
-
     if (this.selectionDragMode && e.pointerId === this.activePointerId) {
+      this.touchPanStart = null;
+      this.isPanning = false;
       const pt = this.getCanvasCoords(e.clientX, e.clientY);
       if (this.selectionDragMode === 'move') {
         const dx = pt.x - this.selectionDragStart.lastX;
@@ -593,6 +654,14 @@ export class CanvasEngine {
       } else if (this.selectionDragMode === 'scale') {
         this.scaleSelectedItemsTo(pt.x, pt.y);
       }
+      return;
+    }
+
+    if (this.isPanning && e.pointerId === this.activePointerId) {
+      const dx = e.clientX - this.panStart.x;
+      const dy = e.clientY - this.panStart.y;
+      this.viewportEl.scrollLeft = this.panStart.scrollLeft - dx;
+      this.viewportEl.scrollTop = this.panStart.scrollTop - dy;
       return;
     }
 
@@ -985,6 +1054,7 @@ export class CanvasEngine {
     const shapeIds = new Set();
     const textIds = new Set();
     const imageIds = new Set();
+    const audioIds = new Set();
 
     let minX = Infinity,
       minY = Infinity,
@@ -1036,11 +1106,24 @@ export class CanvasEngine {
       }
     }
 
+    for (const aud of this.page.audioNotes || []) {
+      const ax = typeof aud.x === 'number' ? aud.x : 110;
+      const ay = typeof aud.y === 'number' ? aud.y : 120;
+      const cx = ax + 150;
+      const cy = ay + 52;
+      if (this.pointInPolygon(cx, cy, poly) || this.pointInPolygon(ax + 40, ay + 20, poly)) {
+        audioIds.add(aud.id);
+        expandBounds(ax, ay);
+        expandBounds(ax + 300, ay + 108);
+      }
+    }
+
     if (
       strokeIds.size === 0 &&
       shapeIds.size === 0 &&
       textIds.size === 0 &&
-      imageIds.size === 0
+      imageIds.size === 0 &&
+      audioIds.size === 0
     ) {
       this.clearSelection();
       return;
@@ -1052,6 +1135,7 @@ export class CanvasEngine {
       shapeIds,
       textIds,
       imageIds,
+      audioIds,
       bounds: {
         x: minX - pad,
         y: minY - pad,
@@ -1079,7 +1163,7 @@ export class CanvasEngine {
 
   translateSelectedItems(dx, dy) {
     if (!this.selection) return;
-    const { strokeIds, shapeIds, textIds, imageIds, bounds } = this.selection;
+    const { strokeIds, shapeIds, textIds, imageIds, audioIds, bounds } = this.selection;
 
     for (const st of this.page.strokes) {
       if (strokeIds.has(st.id)) {
@@ -1110,6 +1194,15 @@ export class CanvasEngine {
       if (imageIds.has(img.id)) {
         img.x += dx;
         img.y += dy;
+      }
+    }
+
+    if (audioIds) {
+      for (const aud of this.page.audioNotes || []) {
+        if (audioIds.has(aud.id)) {
+          aud.x = Math.max(0, Math.min(PAGE_WIDTH - 120, Math.round((aud.x || 110) + dx)));
+          aud.y = Math.max(0, Math.min(PAGE_HEIGHT - 50, Math.round((aud.y || 120) + dy)));
+        }
       }
     }
 
@@ -1177,11 +1270,12 @@ export class CanvasEngine {
   duplicateSelection() {
     if (!this.selection) return;
     this.pushUndoSnapshot();
-    const { strokeIds, shapeIds, textIds, bounds } = this.selection;
+    const { strokeIds, shapeIds, textIds, audioIds, bounds } = this.selection;
     const offset = 28;
     const newStrokeIds = new Set();
     const newShapeIds = new Set();
     const newTextIds = new Set();
+    const newAudioIds = new Set();
 
     for (const st of this.page.strokes) {
       if (strokeIds.has(st.id)) {
@@ -1223,11 +1317,27 @@ export class CanvasEngine {
       }
     }
 
+    if (audioIds) {
+      for (const aud of this.page.audioNotes || []) {
+        if (audioIds.has(aud.id)) {
+          const cloneId = `aud-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+          this.page.audioNotes.push({
+            ...aud,
+            id: cloneId,
+            x: (aud.x || 110) + offset,
+            y: (aud.y || 120) + offset
+          });
+          newAudioIds.add(cloneId);
+        }
+      }
+    }
+
     this.selection = {
       strokeIds: newStrokeIds,
       shapeIds: newShapeIds,
       textIds: newTextIds,
       imageIds: new Set(),
+      audioIds: newAudioIds,
       bounds: {
         x: bounds.x + offset,
         y: bounds.y + offset,
@@ -1246,11 +1356,14 @@ export class CanvasEngine {
   deleteSelection() {
     if (!this.selection) return;
     this.pushUndoSnapshot();
-    const { strokeIds, shapeIds, textIds, imageIds } = this.selection;
+    const { strokeIds, shapeIds, textIds, imageIds, audioIds } = this.selection;
     this.page.strokes = this.page.strokes.filter((s) => !strokeIds.has(s.id));
     this.page.shapes = this.page.shapes.filter((s) => !shapeIds.has(s.id));
     this.page.textBoxes = this.page.textBoxes.filter((t) => !textIds.has(t.id));
     this.page.images = this.page.images.filter((i) => !imageIds.has(i.id));
+    if (audioIds && this.page.audioNotes) {
+      this.page.audioNotes = this.page.audioNotes.filter((a) => !audioIds.has(a.id));
+    }
     this.clearSelection();
     this.renderMain();
     this.renderDOMOverlays();
@@ -1802,8 +1915,8 @@ export class CanvasEngine {
 
       card.append(headerBar, playerRow, noteInput);
 
-      // Kartı üst çubuğundan (headerBar) tutarak sayfanın her yerine serbestçe taşıyabilme
-      this.makeElementDraggable(headerBar, card, audioObj, () => {
+      // Kartı üst çubuğundan veya kart gövdesinden tutarak sayfanın her yerine serbestçe taşıyabilme (sayfa kaymadan)
+      this.makeElementDraggable(card, card, audioObj, () => {
         this.onChange();
       });
 
@@ -2039,15 +2152,48 @@ export class CanvasEngine {
     let origX = 0;
     let origY = 0;
 
+    // Dokunmatik olayların arka plandaki sayfayı kaydırmasını engelle
+    containerEl.addEventListener(
+      'touchstart',
+      (e) => {
+        this.touchPanStart = null;
+        this.isPanning = false;
+        e.stopPropagation();
+      },
+      { passive: true }
+    );
+
+    containerEl.addEventListener(
+      'touchmove',
+      (e) => {
+        this.touchPanStart = null;
+        this.isPanning = false;
+        e.stopPropagation();
+        if (dragging && e.cancelable) {
+          e.preventDefault();
+        }
+      },
+      { passive: false }
+    );
+
     handleEl.addEventListener('pointerdown', (e) => {
+      if (
+        handleEl === containerEl &&
+        e.target.closest('button:not(.overlay-ctrl-btn), input, textarea, a, [contenteditable="true"]')
+      ) {
+        return;
+      }
       e.stopPropagation();
       e.preventDefault();
+      this.touchPanStart = null;
+      this.isPanning = false;
+      this.isOverlayDragging = true;
       this.pushUndoSnapshot();
       dragging = true;
       startX = e.clientX;
       startY = e.clientY;
-      origX = dataModel.x;
-      origY = dataModel.y;
+      origX = dataModel.x || 0;
+      origY = dataModel.y || 0;
       try {
         handleEl.setPointerCapture(e.pointerId);
       } catch {}
@@ -2055,6 +2201,10 @@ export class CanvasEngine {
 
     handleEl.addEventListener('pointermove', (e) => {
       if (!dragging) return;
+      e.stopPropagation();
+      e.preventDefault();
+      this.touchPanStart = null;
+      this.isPanning = false;
       const dx = (e.clientX - startX) / this.zoom;
       const dy = (e.clientY - startY) / this.zoom;
       dataModel.x = Math.max(0, Math.min(PAGE_WIDTH - 80, Math.round(origX + dx)));
@@ -2063,14 +2213,20 @@ export class CanvasEngine {
       containerEl.style.top = `${dataModel.y}px`;
     });
 
-    handleEl.addEventListener('pointerup', (e) => {
+    const endDrag = (e) => {
       if (!dragging) return;
       dragging = false;
+      this.isOverlayDragging = false;
       try {
-        handleEl.releasePointerCapture(e.pointerId);
+        if (e && e.pointerId !== undefined) {
+          handleEl.releasePointerCapture(e.pointerId);
+        }
       } catch {}
       onSave();
-    });
+    };
+
+    handleEl.addEventListener('pointerup', endDrag);
+    handleEl.addEventListener('pointercancel', endDrag);
   }
 
   makeImageResizable(handleEl, containerEl, imgModel, onSave) {
@@ -2079,9 +2235,22 @@ export class CanvasEngine {
     let origW = 0;
     let aspect = 1;
 
+    handleEl.addEventListener(
+      'touchstart',
+      (e) => {
+        this.touchPanStart = null;
+        this.isPanning = false;
+        e.stopPropagation();
+      },
+      { passive: true }
+    );
+
     handleEl.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       e.preventDefault();
+      this.touchPanStart = null;
+      this.isPanning = false;
+      this.isOverlayDragging = true;
       this.pushUndoSnapshot();
       resizing = true;
       startX = e.clientX;
@@ -2094,6 +2263,10 @@ export class CanvasEngine {
 
     handleEl.addEventListener('pointermove', (e) => {
       if (!resizing) return;
+      e.stopPropagation();
+      e.preventDefault();
+      this.touchPanStart = null;
+      this.isPanning = false;
       const dx = (e.clientX - startX) / this.zoom;
       const nextW = Math.max(80, Math.min(PAGE_WIDTH - imgModel.x, Math.round(origW + dx)));
       const nextH = Math.round(nextW * aspect);
@@ -2103,14 +2276,20 @@ export class CanvasEngine {
       containerEl.style.height = `${nextH}px`;
     });
 
-    handleEl.addEventListener('pointerup', (e) => {
+    const endResize = (e) => {
       if (!resizing) return;
       resizing = false;
+      this.isOverlayDragging = false;
       try {
-        handleEl.releasePointerCapture(e.pointerId);
+        if (e && e.pointerId !== undefined) {
+          handleEl.releasePointerCapture(e.pointerId);
+        }
       } catch {}
       onSave();
-    });
+    };
+
+    handleEl.addEventListener('pointerup', endResize);
+    handleEl.addEventListener('pointercancel', endResize);
   }
 
   async renderPageToExportCanvas(pageObj, scale = 2) {
