@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#16181D" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>TabNote Studio — Tablet & Kalem Not Defteri</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,400&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+  <!-- Çok sayfalı PDF dışa aktarma için jsPDF ve PDF içe aktarma için PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+</head>
+<body>
+  <div id="appShell" class="app-shell">
+    <!-- SOL ÇEKMECE: KLASÖRLER, NOT DEFTERLERİ VE SAYFA ÖNİZLEMELERİ -->
+    <aside id="sidebarDrawer" class="sidebar-drawer">
+      <div class="sidebar-brand-header">
+        <div class="brand-logo-group">
+          <div class="brand-emblem">
+            <svg viewBox="0 0 28 28" fill="none">
+              <rect x="3" y="3" width="22" height="22" rx="6" fill="#2563EB" />
+              <path d="M8 10h12M8 14.5h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
+              <path d="M16.5 21l5.5-9.5 2.5 1.5-5.5 9.5-3 .8.5-2.3z" fill="#FACC15" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="brand-title">TabNote</h1>
+            <span class="brand-subtitle">Kalem & Not Stüdyosu</span>
+          </div>
+        </div>
+        <button type="button" id="closeSidebarMobileBtn" class="icon-btn mobile-only" title="Menüyü Kapat">✕</button>
+      </div>
+
+      <!-- Yeni Not Defteri Ana Aksiyon -->
+      <div class="sidebar-primary-cta">
+        <button type="button" id="newNotebookBtn" class="btn-new-notebook">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+            <path d="M12 5v14M5 12h14" stroke-linecap="round" />
+          </svg>
+          <span>Yeni Not Defteri</span>
+        </button>
+      </div>
+
+      <!-- Sekme Seçici: Defterler | Sayfalar -->
+      <div class="sidebar-tabs">
+        <button type="button" class="sidebar-tab-btn active" data-tab="notebooks">Defterlerim</button>
+        <button type="button" class="sidebar-tab-btn" data-tab="pages">Sayfalar</button>
+      </div>
+
+      <!-- SEKME 1: KLASÖRLER VE NOT DEFTERLERİ -->
+      <div id="notebooksTabPane" class="sidebar-pane">
+        <div class="search-box-wrap">
+          <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8" />
+            <path d="M21 21l-4.3-4.3" stroke-linecap="round" />
+          </svg>
+          <input type="text" id="searchNotebooksInput" placeholder="Notlarda veya başlıklarda ara..." />
+        </div>
+
+        <div class="sidebar-section-header">
+          <span>KLASÖRLER</span>
+          <button type="button" id="newFolderBtn" class="link-mini-btn" title="Yeni Klasör Ekle">+ Klasör</button>
+        </div>
+        <div id="folderListContainer" class="folder-list"></div>
+
+        <div class="sidebar-section-header">
+          <span>NOT DEFTERLERİ</span>
+        </div>
+        <div id="notebookCardsContainer" class="notebook-cards-list"></div>
+      </div>
+
+      <!-- SEKME 2: AKTİF DEFTERİN SAYFA KÜÇÜK RESİMLERİ -->
+      <div id="pagesTabPane" class="sidebar-pane hidden">
+        <div class="pages-pane-top">
+          <span class="pages-pane-hint">Sayfalar arası hızlı geçiş</span>
+          <button type="button" id="sidebarAddPageBtn" class="btn-secondary-sm">+ Sayfa Ekle</button>
+        </div>
+        <div id="pageThumbnailsGrid" class="page-thumbnails-grid"></div>
+      </div>
+    </aside>
+
+    <!-- ANA ÇALIŞMA ALANI (STÜDYO) -->
+    <main class="studio-main">
+      <!-- ÜST STÜDYO ÇUBUĞU -->
+      <header class="studio-topbar">
+        <div class="topbar-left">
+          <button type="button" id="toggleSidebarBtn" class="icon-btn" title="Kenar Çubuğunu Aç/Kapat">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="16" rx="2" />
+              <path d="M9 4v16" />
+            </svg>
+          </button>
+
+          <div class="doc-title-group">
+            <input type="text" id="notebookTitleInput" class="doc-title-input" value="Not Defteri" aria-label="Not Defteri Başlığı" />
+            <button type="button" id="toggleFavNotebookBtn" class="fav-star-btn" title="Favorilere Ekle">★</button>
+            <span id="saveStatusBadge" class="save-status-badge">Kaydedildi</span>
+          </div>
+        </div>
+
+        <!-- ORTA: SAYFA GEZİNTİSİ -->
+        <div class="topbar-center">
+          <div class="page-nav-pill">
+            <button type="button" id="prevPageBtn" class="page-step-btn" title="Önceki Sayfa">‹</button>
+            <span id="pageIndicatorText" class="page-indicator-text">Sayfa 1 / 1</span>
+            <button type="button" id="nextPageBtn" class="page-step-btn" title="Sonraki Sayfa">›</button>
+            <span class="pill-divider"></span>
+            <button type="button" id="addPageBtn" class="page-add-inline-btn" title="Yeni Sayfa Ekle">+ Sayfa</button>
+          </div>
+        </div>
+
+        <!-- SAĞ: KALEM AKTİF/DEĞİL, EKLE (FOTO/PDF/DOSYA), ŞABLON, EXPORT -->
+        <div class="topbar-right">
+          <!-- KALEM AKTİF / AKTİF DEĞİL ANAHTARI -->
+          <button type="button" id="penActiveToggleBtn" class="pen-state-btn is-active" title="Kalem durumunu değiştir: Kalem Aktif Değil iken parmakla veya kalemle dokunarak sayfayı rahatça kaydırabilirsiniz">
+            <span class="pen-state-dot"></span>
+            <span id="penActiveStateText">Kalem Aktif</span>
+          </button>
+
+          <!-- PARMAKLA KAYDIRMA (AVUÇ İÇİ REDDİ) ANAHTARI -->
+          <button type="button" id="fingerScrollToggleBtn" class="palm-reject-btn active" title="Açıkken parmak dokunuşu çizim yapmaz, doğrudan sayfayı aşağı/yukarı kaydırır">
+            <span>👆 Parmak Kaydırır</span>
+          </button>
+
+          <div class="action-group-pill">
+            <button type="button" id="undoBtn" class="icon-btn" title="Geri Al (Ctrl+Z)" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 14 4 9l5-5" />
+                <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11" />
+              </svg>
+            </button>
+            <button type="button" id="redoBtn" class="icon-btn" title="İleri Al (Ctrl+Y)" disabled>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="m15 14 5-5-5-5" />
+                <path d="M20 9H9.5A5.5 5.5 0 0 0 4 14.5v0A5.5 5.5 0 0 0 9.5 20H13" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- DOĞRUDAN SATIRA SES KAYDETME BUTONU -->
+          <button type="button" id="voiceRecordBtn" class="toolbar-chip-btn voice-chip" title="Aktif Satıra Doğrudan Ses Kaydet (Veya sayfadaki herhangi bir satırın solundaki 🎙️ butonuna basın)">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+            </svg>
+            <span id="voiceRecordBtnLabel">🎙️ Satıra Kaydet</span>
+          </button>
+
+          <!-- İÇERİYE FOTOĞRAF, PDF VE DOSYA EKLEME BUTONU -->
+          <button type="button" id="openImportModalBtn" class="toolbar-chip-btn accent-chip" title="Sayfaya Fotoğraf, PDF veya Dosya Ekle">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M12 5v14M5 12h14" stroke-linecap="round" />
+            </svg>
+            <span>İçeri Ekle</span>
+          </button>
+
+          <!-- GİZLİ DOSYA GİRİŞLERİ -->
+          <input type="file" id="imageFileInput" accept="image/*" multiple class="hidden" />
+          <input type="file" id="bgImageFileInput" accept="image/*" class="hidden" />
+          <input type="file" id="pdfFileInput" accept="application/pdf,.pdf" class="hidden" />
+          <input type="file" id="anyFileInput" accept="*/*" class="hidden" />
+
+          <button type="button" id="openTemplateModalBtn" class="toolbar-chip-btn" title="Kağıt Şablonu ve Sayfa Rengi">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M3 9h18M3 15h18M9 3v18" />
+            </svg>
+            <span>Şablon</span>
+          </button>
+
+          <button type="button" id="openExportModalBtn" class="toolbar-chip-btn primary-chip" title="PDF veya Görsel Olarak Dışa Aktar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>Dışa Aktar</span>
+          </button>
+
+          <button type="button" id="zenModeBtn" class="icon-btn" title="Tam Ekran Odak Modu">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- SAMSUNG NOTES TARZI KALEM VE MÜREKKEP İSTASYONU (STYLUS DOCK) -->
+      <section class="stylus-dock-bar" aria-label="Kalem ve Çizim Araçları">
+        <!-- Kalem Uçları (Physical Pen Nibs) -->
+        <div class="pen-instruments-rack">
+          <button type="button" class="tool-dock-btn active" data-tool="fountain" title="Dolma Kalem (Basınç Hassasiyetli Kaligrafik Uç)">
+            <svg class="pen-nib-svg" viewBox="0 0 36 48">
+              <path d="M18 4 L27 22 L24 44 L12 44 L9 22 Z" fill="#CBD5E1" stroke="#475569" stroke-width="1.5" />
+              <path class="dynamic-ink-nib" d="M14 44 L22 44 L24 28 L18 14 L12 28 Z" fill="#1E293B" />
+              <line x1="18" y1="5" x2="18" y2="21" stroke="#1E293B" stroke-width="1.5" />
+              <circle cx="18" cy="21" r="2" fill="#1E293B" />
+            </svg>
+            <span class="tool-label">Dolma</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="ballpoint" title="Tükenmez Kalem (Dengeli Günlük El Yazısı)">
+            <svg class="pen-nib-svg" viewBox="0 0 36 48">
+              <path d="M15 8 C15 5, 21 5, 21 8 L24 26 L23 44 L13 44 L12 26 Z" fill="#E2E8F0" stroke="#475569" stroke-width="1.5" />
+              <path class="dynamic-ink-nib" d="M13 30 L23 30 L23 44 L13 44 Z" fill="#1E293B" />
+              <circle class="dynamic-ink-nib" cx="18" cy="6" r="2.5" fill="#1E293B" />
+            </svg>
+            <span class="tool-label">Tükenmez</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="pencil" title="Kurşun Kalem (Eskiz ve Gölgelendirme)">
+            <svg class="pen-nib-svg" viewBox="0 0 36 48">
+              <polygon points="18,4 25,20 25,44 11,44 11,20" fill="#FDE68A" stroke="#92400E" stroke-width="1.5" />
+              <polygon class="dynamic-ink-nib" points="18,4 22,13 14,13" fill="#1E293B" />
+              <rect x="11" y="34" width="14" height="10" fill="#F59E0B" />
+            </svg>
+            <span class="tool-label">Kurşun</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="highlighter" title="Fosforlu Kalem (Metin Vurgulama)">
+            <svg class="pen-nib-svg" viewBox="0 0 36 48">
+              <polygon class="dynamic-ink-nib" points="12,10 25,5 25,20 11,20" fill="#FACC15" opacity="0.88" />
+              <rect x="9" y="20" width="18" height="24" rx="2" fill="#334155" stroke="#64748B" stroke-width="1.5" />
+              <rect class="dynamic-ink-nib" x="11" y="28" width="14" height="8" rx="1" fill="#FACC15" />
+            </svg>
+            <span class="tool-label">Fosforlu</span>
+          </button>
+
+          <span class="dock-sep"></span>
+
+          <button type="button" class="tool-dock-btn" data-tool="eraser" title="Silgi (Çizgi Silgisi veya Bölgesel Silgi)">
+            <svg class="pen-nib-svg" viewBox="0 0 36 48">
+              <rect x="10" y="8" width="16" height="20" rx="4" fill="#FDA4AF" stroke="#E11D48" stroke-width="1.5" />
+              <rect x="9" y="24" width="18" height="20" rx="2" fill="#E2E8F0" stroke="#475569" stroke-width="1.5" />
+            </svg>
+            <span class="tool-label">Silgi</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="shape" title="Geometrik Şekiller (Çizgi, Ok, Dikdörtgen, Daire, Üçgen)">
+            <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="11" height="11" rx="2" />
+              <circle cx="15.5" cy="15.5" r="5.5" />
+            </svg>
+            <span class="tool-label">Şekiller</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="lasso" title="Kement Seçimi (Çizimleri Seç, Taşı, Boyutlandır veya Kopyala)">
+            <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2">
+              <path d="M7 22a5 5 0 0 1-2-4" />
+              <path d="M3.3 14A6.8 6.8 0 0 1 2 10c0-4.4 4.5-8 10-8s10 3.6 10 8-4.5 8-10 8a12 12 0 0 1-5-1" />
+              <circle cx="7" cy="18" r="2" stroke-dasharray="none" />
+            </svg>
+            <span class="tool-label">Kement</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="text" title="Metin Kutusu Ekle (Sayfada İstediğin Yere Tıkla ve Yaz)">
+            <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polyline points="4 7 4 4 20 4 20 7" />
+              <line x1="9" y1="20" x2="15" y2="20" />
+              <line x1="12" y1="4" x2="12" y2="20" />
+            </svg>
+            <span class="tool-label">Metin</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="voice" title="Satıra Ses Kaydet Aracı (Sayfada istediğin satıra dokun, direkt o satıra ses kaydı başlat)">
+            <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.2">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+              <line x1="12" y1="19" x2="12" y2="22" />
+            </svg>
+            <span class="tool-label">Satır Ses</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="laser" title="Lazer İşaretçi (Sunum ve Çalışma İçin Kaybolan Lazer İzi)">
+            <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.2">
+              <circle cx="12" cy="12" r="4" fill="#EF4444" />
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" />
+            </svg>
+            <span class="tool-label">Lazer</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="pan" title="Sayfayı Kaydır (El Aracı - Parmakla veya Kalemle Sayfayı Kaydır)">
+            <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+              <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
+              <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
+              <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.8-5.9-2.3L3.3 16.9a1.6 1.6 0 0 1 2.3-2.3L8 17" />
+            </svg>
+            <span class="tool-label">Kaydır</span>
+          </button>
+        </div>
+
+        <!-- Sağ Kalem Ayarları: Renk Paleti, Kalınlık Sürgüsü ve Basınç/Otomatik Şekil -->
+        <div class="pen-properties-rack">
+          <!-- Renk Paleti -->
+          <div class="color-palette-group">
+            <div id="colorSwatchesContainer" class="color-swatches-row"></div>
+            <label class="custom-color-wheel" title="Özel Mürekkep Rengi Seç">
+              <input type="color" id="customColorPicker" value="#0F172A" />
+              <span class="wheel-ring"></span>
+            </label>
+          </div>
+
+          <span class="dock-sep"></span>
+
+          <!-- Çizgi Kalınlığı -->
+          <div class="stroke-width-group">
+            <div class="quick-widths">
+              <button type="button" class="width-preset-btn" data-size="2" title="İnce Uç (2px)">
+                <span class="dot" style="width:4px;height:4px"></span>
+              </button>
+              <button type="button" class="width-preset-btn active" data-size="4" title="Orta Uç (4px)">
+                <span class="dot" style="width:7px;height:7px"></span>
+              </button>
+              <button type="button" class="width-preset-btn" data-size="8" title="Kalın Uç (8px)">
+                <span class="dot" style="width:11px;height:11px"></span>
+              </button>
+              <button type="button" class="width-preset-btn" data-size="18" title="Vurgu Ucu (18px)">
+                <span class="dot" style="width:15px;height:15px"></span>
+              </button>
+            </div>
+            <input type="range" id="strokeSizeSlider" min="1" max="36" value="4" class="size-slider" aria-label="Kalem Kalınlığı" />
+            <span id="strokeSizeValue" class="size-readout">4 px</span>
+          </div>
+
+          <span class="dock-sep"></span>
+
+          <!-- Akıllı Kalem Özellikleri: Basınç & Basılı Tutunca Otomatik Şekil -->
+          <div class="smart-pen-toggles">
+            <label class="chip-toggle" title="Kalemi bastırdıkça çizginin kalınlaşmasını sağlar">
+              <input type="checkbox" id="pressureToggleChk" checked />
+              <span>Basınç</span>
+            </label>
+            <label class="chip-toggle" title="Çizgi, daire veya dikdörtgen çizip kalemi 0.5 sn sabit tuttuğunuzda otomatik düzgün şekle dönüştürür">
+              <input type="checkbox" id="autoShapeToggleChk" checked />
+              <span>Oto-Şekil</span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- SİLGİ ALT PANELİ (Silgi seçildiğinde açılır) -->
+      <div id="eraserSubPanel" class="sub-tool-bar hidden">
+        <span class="sub-bar-title">Silgi Modu:</span>
+        <label class="radio-pill">
+          <input type="radio" name="eraserModeRadio" value="stroke" checked />
+          <span>Çizgi Silgisi (Dokunulan Çizgiyi Sil)</span>
+        </label>
+        <label class="radio-pill">
+          <input type="radio" name="eraserModeRadio" value="partial" />
+          <span>Bölgesel Silgi (Kısmi Sil)</span>
+        </label>
+        <button type="button" id="clearCurrentPageBtn" class="btn-danger-outline-sm">Tüm Sayfayı Temizle</button>
+      </div>
+
+      <!-- ŞEKİL ARACI ALT PANELİ (Şekiller seçildiğinde açılır) -->
+      <div id="shapeSubPanel" class="sub-tool-bar hidden">
+        <span class="sub-bar-title">Geometrik Şekil:</span>
+        <button type="button" class="shape-type-btn active" data-shape="rectangle">▭ Dikdörtgen</button>
+        <button type="button" class="shape-type-btn" data-shape="ellipse">◯ Daire / Elips</button>
+        <button type="button" class="shape-type-btn" data-shape="line">╱ Düz Çizgi</button>
+        <button type="button" class="shape-type-btn" data-shape="arrow">↗ Ok</button>
+        <button type="button" class="shape-type-btn" data-shape="triangle">△ Üçgen</button>
+        <button type="button" class="shape-type-btn" data-shape="axes">∟ Koordinat Ekseni</button>
+        <label class="chip-toggle">
+          <input type="checkbox" id="shapeFillChk" />
+          <span>İçi Renkli Dolgulu</span>
+        </label>
+      </div>
+
+      <!-- CANLI SES KAYIT ÇUBUĞU (Kayıt başladığında görünür, kalemle yazmaya engel olmaz) -->
+      <div id="voiceRecorderBar" class="voice-recorder-bar hidden">
+        <div class="rec-live-indicator">
+          <span class="rec-pulse-dot"></span>
+          <span id="recStateLabel" class="rec-state-label">Ses Kaydediliyor...</span>
+          <span id="recTimerDisplay" class="rec-timer-display">00:00</span>
+        </div>
+        <div id="recWaveBars" class="rec-wave-bars">
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+        <div class="rec-bar-actions">
+          <button type="button" id="recPauseResumeBtn" class="rec-ctrl-btn">⏸ Duraklat</button>
+          <button type="button" id="recSaveToNoteBtn" class="rec-ctrl-btn primary">✓ Kaydı Bitir ve Nota Ekle</button>
+          <button type="button" id="recCancelBtn" class="rec-ctrl-btn danger">✕ İptal</button>
+        </div>
+      </div>
+
+      <!-- TUVAL ÇALIŞMA MASASI (CANVAS VIEWPORT) -->
+      <div id="canvasViewport" class="canvas-viewport">
+        <div id="pageScaleWrapper" class="page-scale-wrapper">
+          <div class="paper-sheet-container">
+            <canvas id="mainCanvas" class="paper-canvas main-canvas"></canvas>
+            <canvas id="liveCanvas" class="paper-canvas live-canvas"></canvas>
+            <div id="domOverlayLayer" class="dom-overlay-layer"></div>
+
+            <!-- Kement (Lasso) Seçimi Yapıldığında Çıkan Yüzen Araç Çubuğu -->
+            <div id="lassoActionBar" class="lasso-action-bar hidden">
+              <span class="lasso-badge">Seçim</span>
+              <label class="lasso-color-btn" title="Seçili Çizimlerin Rengini Değiştir">
+                <span>🎨 Renk</span>
+                <input type="color" id="lassoColorInput" value="#2563EB" />
+              </label>
+              <button type="button" id="lassoDuplicateBtn" title="Seçimi Çoğalt">⧉ Çoğalt</button>
+              <button type="button" id="lassoDeleteBtn" class="danger" title="Seçimi Sil">🗑 Sil</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALT YÜZEN DURUM & YAKINLAŞTIRMA ÇUBUĞU -->
+      <footer class="studio-bottom-hud">
+        <div class="hud-left-status">
+          <span id="penHudStatusText" class="hud-metric">Kalem Aktif</span>
+          <span class="pill-divider"></span>
+          <span id="pressureReadout" class="hud-metric">Basınç: Hazır</span>
+        </div>
+
+        <!-- Hızlı Sayfa Yukarı / Aşağı Kaydırma Tuşları -->
+        <div class="hud-scroll-controls">
+          <button type="button" id="scrollUpFastBtn" class="hud-scroll-btn" title="Sayfayı Yukarı Kaydır">▲ Yukarı</button>
+          <button type="button" id="scrollDownFastBtn" class="hud-scroll-btn" title="Sayfayı Aşağı Kaydır">▼ Aşağı</button>
+        </div>
+
+        <div class="hud-zoom-controls">
+          <button type="button" id="zoomOutBtn" class="hud-zoom-btn" title="Uzaklaştır">−</button>
+          <button type="button" id="zoomResetBtn" class="hud-zoom-value" title="Yakınlaştırmayı Sıfırla (%100)">
+            <span id="zoomValueLabel">%100</span>
+          </button>
+          <button type="button" id="zoomInBtn" class="hud-zoom-btn" title="Yakınlaştır">+</button>
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- MODAL 0: İÇERİYE FOTOĞRAF, PDF, SES VE DOSYA EKLEME MODALI -->
+  <div id="importModal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h3>Not Defterine İçerik Ekle</h3>
+          <p class="modal-sub">Sayfanıza fotoğraf, çok sayfalı PDF belgesi veya dosya ekleyin.</p>
+        </div>
+        <button type="button" id="closeImportModalBtn" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body export-options-list">
+        <button type="button" id="triggerPhotoInsertBtn" class="export-option-card">
+          <div class="export-icon png">FOTO</div>
+          <div class="export-info">
+            <strong>📷 Fotoğraf / Görsel Ekle (Taşınabilir & Boyutlandırılabilir)</strong>
+            <span>Galeriden veya dosyalardan bir ya da birden fazla fotoğraf seçip sayfanın istediğiniz yerine yerleştirin.</span>
+          </div>
+        </button>
+
+        <button type="button" id="triggerBgPhotoInsertBtn" class="export-option-card">
+          <div class="export-icon import">ARKA PLAN</div>
+          <div class="export-info">
+            <strong>🖼️ Sayfa Arka Planı Olarak Fotoğraf / Taranmış Kağıt Ekle</strong>
+            <span>Seçtiğiniz görseli tüm sayfaya sabit arka plan olarak döşer; üzerine rahatça kalemle yazabilirsiniz.</span>
+          </div>
+        </button>
+
+        <button type="button" id="triggerPdfImportBtn" class="export-option-card">
+          <div class="export-icon pdf">PDF</div>
+          <div class="export-info">
+            <strong>📄 PDF Belgesi İçe Aktar (.pdf)</strong>
+            <span>PDF dosyasının sayfalarını not defterinize sayfa olarak ekler; ders notu ve PDF'lerin üzerine kalemle çizebilirsiniz.</span>
+          </div>
+        </button>
+
+        <button type="button" id="triggerAnyFileImportBtn" class="export-option-card">
+          <div class="export-icon json">DOSYA</div>
+          <div class="export-info">
+            <strong>📎 Dosya / Metin Belgesi Ekle (.txt, .md, .docx, .zip, .json vb.)</strong>
+            <span>Metin belgelerini sayfaya aktarır veya herhangi bir dosyayı sayfaya taşınabilir dosya kartı olarak iliştirir.</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 1: KAĞIT ŞABLONU VE SAYFA RENGİ SEÇİCİ -->
+  <div id="templateModal" class="modal-backdrop hidden">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div>
+          <h3>Kağıt Şablonu ve Sayfa Rengi</h3>
+          <p class="modal-sub">Notunuzun sayfa düzenini ve göz konforuna uygun kağıt tonunu seçin.</p>
+        </div>
+        <button type="button" id="closeTemplateModalBtn" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body">
+        <h4 class="modal-section-label">Sayfa Rengi</h4>
+        <div id="paperColorsGrid" class="paper-colors-grid"></div>
+
+        <h4 class="modal-section-label">Kağıt Kılavuz Şablonu</h4>
+        <div id="paperTemplatesGrid" class="paper-templates-grid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: DIŞA AKTAR / YEDEKLE (PDF, PNG, JSON) -->
+  <div id="exportModal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div>
+          <h3>Not Defterini Dışa Aktar & Paylaş</h3>
+          <p class="modal-sub">El yazısı notlarınızı PDF belgesi veya yüksek çözünürlüklü görsel olarak kaydedin.</p>
+        </div>
+        <button type="button" id="closeExportModalBtn" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body export-options-list">
+        <button type="button" id="exportPdfBtn" class="export-option-card">
+          <div class="export-icon pdf">PDF</div>
+          <div class="export-info">
+            <strong>Çok Sayfalı PDF Belgesi İndir (.pdf)</strong>
+            <span>Defterdeki tüm sayfaları vektör kalitesinde tek bir PDF dosyası olarak kaydeder.</span>
+          </div>
+        </button>
+
+        <button type="button" id="exportPngBtn" class="export-option-card">
+          <div class="export-icon png">PNG</div>
+          <div class="export-info">
+            <strong>Bu Sayfayı Görsel Olarak İndir (.png)</strong>
+            <span>Açık olan sayfayı şablonu ve çizimleriyle birlikte yüksek çözünürlüklü resim olarak indirir.</span>
+          </div>
+        </button>
+
+        <button type="button" id="exportJsonBtn" class="export-option-card">
+          <div class="export-icon json">YEDEK</div>
+          <div class="export-info">
+            <strong>Düzenlenebilir TabNote Yedeği İndir (.json)</strong>
+            <span>Notlarınızı başka bir tablete/bilgisayara taşımak için ham çizim verisi olarak yedekler.</span>
+          </div>
+        </button>
+
+        <button type="button" id="importJsonBtn" class="export-option-card secondary">
+          <div class="export-icon import">İÇE AKTAR</div>
+          <div class="export-info">
+            <strong>Yedek Dosyasından Not Defteri Yükle</strong>
+            <span>Daha önce indirdiğiniz .tabnote.json dosyasını geri yükleyin.</span>
+          </div>
+        </button>
+        <input type="file" id="importJsonInput" accept=".json" class="hidden" />
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: YENİ KLASÖR / İSİMLENDİRME MODALI -->
+  <div id="promptModal" class="modal-backdrop hidden">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-header">
+        <h3 id="promptModalTitle">Yeni Klasör</h3>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="promptModalInput" class="modal-text-input" />
+        <div class="modal-actions">
+          <button type="button" id="promptModalCancelBtn" class="btn-secondary-sm">İptal</button>
+          <button type="button" id="promptModalConfirmBtn" class="btn-primary-sm">Oluştur</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BİLDİRİM TOAST -->
+  <div id="statusToast" class="status-toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

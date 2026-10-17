@@ -1,0 +1,27 @@
+{
+  "id": "/",
+  "name": "TabNote Studio — Kalem & Not Defteri",
+  "short_name": "TabNote",
+  "description": "Tablet ve S-Pen uyumlu, basinc hassasiyetli profesyonel dijital not defteri ve cizim studyosu.",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#16181D",
+  "theme_color": "#16181D",
+  "categories": ["productivity", "education", "utilities"],
+  "icons": [
+    {
+      "src": "https://placehold.co/192x192/2563EB/FFFFFF.png?text=TN",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://placehold.co/512x512/2563EB/FFFFFF.png?text=TabNote",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

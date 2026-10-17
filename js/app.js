@@ -1,0 +1,1539 @@
+/**
+ * TabNote Studio — Ana Uygulama Denetleyicisi
+ * (UI, Klasörler, Çoklu Sayfa, Canlı Ses Kaydı ve Nota Ekleme, Foto/PDF/Dosya İçe Aktarma, PDF/PNG Export)
+ */
+
+import { storage } from './storage.js';
+import { PAPER_TEMPLATES, PAPER_COLORS, renderPaperBackground } from './templates.js';
+import { CanvasEngine, PAGE_WIDTH, PAGE_HEIGHT } from './canvas-engine.js';
+
+const INK_PALETTE = [
+  '#0F172A', // Gece Mürekkebi (Siyah/Lacivert)
+  '#1D4ED8', // Kraliyet Mavisi
+  '#DC2626', // Karmen Kırmızısı
+  '#059669', // Zümrüt Yeşili
+  '#7C3AED', // Ametist Moru
+  '#D97706', // Kehribar Turuncu
+  '#0284C7', // Okyanus Siyanı
+  '#F8FAFC'  // Koyu Kağıt İçin Beyaz Mürekkep
+];
+
+const HIGHLIGHTER_PALETTE = [
+  '#FACC15', // Neon Sarı
+  '#4ADE80', // Fosforlu Yeşil
+  '#38BDF8', // Açık Mavi
+  '#F472B6', // Pembe
+  '#FB923C', // Turuncu
+  '#C084FC'  // Lavanta
+];
+
+class TabNoteApp {
+  constructor() {
+    this.folders = [];
+    this.notebooks = [];
+    this.activeFolderId = 'all';
+    this.activeNotebook = null;
+    this.searchQuery = '';
+    this.sidebarTab = 'notebooks';
+    this.saveDebounce = null;
+    this.engine = null;
+
+    // Canlı Ses Kaydı Durumu
+    this.mediaRecorder = null;
+    this.audioStream = null;
+    this.audioChunks = [];
+    this.recStartTime = 0;
+    this.recElapsedSec = 0;
+    this.recTimerInterval = null;
+    this.isRecPaused = false;
+    this.recCancelled = false;
+  }
+
+  async init() {
+    this.folders = await storage.getFolders();
+    this.notebooks = await storage.getAllNotebooks();
+    this.activeNotebook = this.notebooks[0];
+
+    this.initCanvasEngine();
+    this.bindUIEvents();
+    this.renderSidebar();
+    this.loadActiveNotebookIntoWorkspace();
+    this.updatePenToolbarUI();
+    this.updatePenActiveUI();
+    this.registerServiceWorker();
+  }
+
+  initCanvasEngine() {
+    this.engine = new CanvasEngine({
+      viewportEl: document.getElementById('canvasViewport'),
+      pageWrapperEl: document.getElementById('pageScaleWrapper'),
+      mainCanvas: document.getElementById('mainCanvas'),
+      liveCanvas: document.getElementById('liveCanvas'),
+      overlayLayer: document.getElementById('domOverlayLayer'),
+      selectionToolbarEl: document.getElementById('lassoActionBar'),
+      onChange: () => {
+        this.scheduleAutoSave();
+        this.updateUndoRedoButtons();
+      },
+      onLineVoiceTrigger: ({ lineY, x, lineIndex }) => {
+        if (this.isCurrentlyRecording()) {
+          this.stopAndSaveVoiceRecording();
+        } else {
+          this.startVoiceRecording({ lineY, x, lineIndex });
+        }
+      },
+      onLineVoiceStop: () => {
+        this.stopAndSaveVoiceRecording();
+      },
+      onLineVoiceCancel: () => {
+        this.cancelVoiceRecording();
+      },
+      onStatusUpdate: (info) => {
+        if (info.zoom !== undefined) {
+          document.getElementById('zoomValueLabel').textContent = `%${info.zoom}`;
+        }
+        if (info.pressure !== undefined) {
+          const pEl = document.getElementById('pressureReadout');
+          if (pEl) pEl.textContent = `Basınç: %${info.pressure}`;
+        }
+        if (info.autoShape) {
+          this.showToast(`✨ ${info.autoShape}`);
+        }
+      }
+    });
+  }
+
+  updatePenActiveUI() {
+    const btn = document.getElementById('penActiveToggleBtn');
+    const txt = document.getElementById('penActiveStateText');
+    const hudTxt = document.getElementById('penHudStatusText');
+    const fingerBtn = document.getElementById('fingerScrollToggleBtn');
+
+    if (this.engine.penActive) {
+      btn.classList.add('is-active');
+      btn.classList.remove('is-inactive');
+      txt.textContent = 'Kalem Aktif';
+      if (hudTxt) hudTxt.textContent = 'Kalem Aktif';
+    } else {
+      btn.classList.remove('is-active');
+      btn.classList.add('is-inactive');
+      txt.textContent = 'Kalem Aktif Değil';
+      if (hudTxt) hudTxt.textContent = 'Kalem Aktif Değil (Kaydırma Modu)';
+    }
+
+    if (fingerBtn) {
+      fingerBtn.classList.toggle('active', this.engine.fingerScrollMode);
+      fingerBtn.querySelector('span').textContent = this.engine.fingerScrollMode
+        ? '👆 Parmak Kaydırır'
+        : '👆 Parmak Çizer';
+    }
+  }
+
+  loadActiveNotebookIntoWorkspace() {
+    if (!this.activeNotebook) return;
+
+    const titleInput = document.getElementById('notebookTitleInput');
+    titleInput.value = this.activeNotebook.title || 'Adsız Not Defteri';
+
+    const favBtn = document.getElementById('toggleFavNotebookBtn');
+    favBtn.classList.toggle('is-fav', !!this.activeNotebook.favorite);
+    favBtn.title = this.activeNotebook.favorite ? 'Favorilerden Çıkar' : 'Favorilere Ekle';
+
+    const idx = Math.min(
+      Math.max(0, this.activeNotebook.activePageIndex || 0),
+      this.activeNotebook.pages.length - 1
+    );
+    this.activeNotebook.activePageIndex = idx;
+
+    const currentPage = this.activeNotebook.pages[idx];
+    this.engine.loadPage(currentPage);
+
+    this.updatePageCounterUI();
+    this.updateUndoRedoButtons();
+    if (this.sidebarTab === 'pages') {
+      this.renderPageThumbnails();
+    }
+  }
+
+  updatePageCounterUI() {
+    if (!this.activeNotebook) return;
+    const idx = this.activeNotebook.activePageIndex || 0;
+    const total = this.activeNotebook.pages.length;
+    document.getElementById('pageIndicatorText').textContent = `Sayfa ${idx + 1} / ${total}`;
+    document.getElementById('prevPageBtn').disabled = idx <= 0;
+    document.getElementById('nextPageBtn').disabled = idx >= total - 1;
+  }
+
+  updateUndoRedoButtons() {
+    if (!this.engine) return;
+    document.getElementById('undoBtn').disabled = !this.engine.canUndo();
+    document.getElementById('redoBtn').disabled = !this.engine.canRedo();
+  }
+
+  scheduleAutoSave() {
+    const statusEl = document.getElementById('saveStatusBadge');
+    statusEl.textContent = 'Kaydediliyor...';
+    statusEl.classList.add('saving');
+
+    clearTimeout(this.saveDebounce);
+    this.saveDebounce = setTimeout(async () => {
+      if (this.activeNotebook) {
+        await storage.saveNotebook(this.activeNotebook);
+        statusEl.textContent = 'Kaydedildi';
+        statusEl.classList.remove('saving');
+        this.renderNotebookList();
+        if (this.sidebarTab === 'pages') {
+          this.renderPageThumbnails();
+        }
+      }
+    }, 380);
+  }
+
+  bindUIEvents() {
+    const appShell = document.getElementById('appShell');
+    document.getElementById('toggleSidebarBtn').addEventListener('click', () => {
+      appShell.classList.toggle('sidebar-collapsed');
+    });
+    document.getElementById('closeSidebarMobileBtn').addEventListener('click', () => {
+      appShell.classList.add('sidebar-collapsed');
+    });
+
+    // Kenar çubuğu sekmeleri
+    document.querySelectorAll('.sidebar-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.sidebar-tab-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.sidebarTab = btn.dataset.tab;
+        document
+          .getElementById('notebooksTabPane')
+          .classList.toggle('hidden', this.sidebarTab !== 'notebooks');
+        document
+          .getElementById('pagesTabPane')
+          .classList.toggle('hidden', this.sidebarTab !== 'pages');
+        if (this.sidebarTab === 'pages') {
+          this.renderPageThumbnails();
+        }
+      });
+    });
+
+    document.getElementById('newNotebookBtn').addEventListener('click', () => {
+      this.createNewNotebook();
+    });
+
+    document.getElementById('newFolderBtn').addEventListener('click', () => {
+      this.openPromptModal({
+        title: 'Yeni Klasör Oluştur',
+        placeholder: 'Örn: Fizik 101, Müşteri Notları...',
+        defaultValue: '',
+        onConfirm: async (folderName) => {
+          if (!folderName.trim()) return;
+          const colors = ['#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F59E0B', '#06B6D4'];
+          const newFolder = {
+            id: `fld-${Date.now()}`,
+            name: folderName.trim(),
+            icon: 'folder',
+            color: colors[this.folders.length % colors.length],
+            system: false
+          };
+          this.folders.push(newFolder);
+          await storage.saveFolders(this.folders);
+          this.activeFolderId = newFolder.id;
+          this.renderSidebar();
+          this.showToast(`"${newFolder.name}" klasörü oluşturuldu.`);
+        }
+      });
+    });
+
+    document.getElementById('searchNotebooksInput').addEventListener('input', (e) => {
+      this.searchQuery = e.target.value.trim().toLowerCase();
+      this.renderNotebookList();
+    });
+
+    const titleInput = document.getElementById('notebookTitleInput');
+    titleInput.addEventListener('input', () => {
+      if (!this.activeNotebook) return;
+      this.activeNotebook.title = titleInput.value.trim() || 'Adsız Not Defteri';
+      this.scheduleAutoSave();
+    });
+
+    document.getElementById('toggleFavNotebookBtn').addEventListener('click', () => {
+      if (!this.activeNotebook) return;
+      this.activeNotebook.favorite = !this.activeNotebook.favorite;
+      document
+        .getElementById('toggleFavNotebookBtn')
+        .classList.toggle('is-fav', this.activeNotebook.favorite);
+      this.scheduleAutoSave();
+      this.showToast(
+        this.activeNotebook.favorite ? 'Favorilere eklendi ★' : 'Favorilerden çıkarıldı'
+      );
+    });
+
+    // KALEM AKTİF / KALEM AKTİF DEĞİL BUTONU
+    document.getElementById('penActiveToggleBtn').addEventListener('click', () => {
+      this.engine.penActive = !this.engine.penActive;
+      this.updatePenActiveUI();
+      this.showToast(
+        this.engine.penActive
+          ? '✒️ Kalem Aktif: Sayfa üzerine yazabilirsiniz.'
+          : '✋ Kalem Aktif Değil: Sayfayı parmakla veya kalemle rahatça kaydırabilirsiniz.'
+      );
+    });
+
+    // PARMAK KAYDIRIR / PARMAK ÇİZER BUTONU
+    document.getElementById('fingerScrollToggleBtn').addEventListener('click', () => {
+      this.engine.fingerScrollMode = !this.engine.fingerScrollMode;
+      this.updatePenActiveUI();
+      this.showToast(
+        this.engine.fingerScrollMode
+          ? '👆 Parmak Kaydırır: Parmakla dokunup sürükleyerek sayfayı kaydırabilirsiniz.'
+          : '👆 Parmak Çizer: Parmakla da çizim yapabilirsiniz (2 parmakla kaydırılır).'
+      );
+    });
+
+    // Alt HUD Hızlı Yukarı / Aşağı Kaydırma Tuşları
+    document.getElementById('scrollUpFastBtn').addEventListener('click', () => {
+      this.engine.scrollByOffset(0, -280, true);
+    });
+    document.getElementById('scrollDownFastBtn').addEventListener('click', () => {
+      this.engine.scrollByOffset(0, 280, true);
+    });
+
+    // DOĞRUDAN SATIRA SES KAYDETME BUTONLARI
+    document.getElementById('voiceRecordBtn').addEventListener('click', () => {
+      if (this.isCurrentlyRecording()) {
+        this.stopAndSaveVoiceRecording();
+      } else {
+        const targetLineY = this.engine.snapYToLine(this.engine.lastActiveLineY || 116);
+        this.startVoiceRecording({ lineY: targetLineY });
+      }
+    });
+
+    document.getElementById('recPauseResumeBtn').addEventListener('click', () => {
+      this.togglePauseVoiceRecording();
+    });
+
+    document.getElementById('recSaveToNoteBtn').addEventListener('click', () => {
+      this.stopAndSaveVoiceRecording();
+    });
+
+    document.getElementById('recCancelBtn').addEventListener('click', () => {
+      this.cancelVoiceRecording();
+    });
+
+    // Geri Al / İleri Al
+    document.getElementById('undoBtn').addEventListener('click', () => {
+      this.engine.undo();
+      this.updateUndoRedoButtons();
+    });
+    document.getElementById('redoBtn').addEventListener('click', () => {
+      this.engine.redo();
+      this.updateUndoRedoButtons();
+    });
+
+    // Sayfalar Arası Geçiş & Yeni Sayfa
+    document.getElementById('prevPageBtn').addEventListener('click', () => {
+      if (!this.activeNotebook || this.activeNotebook.activePageIndex <= 0) return;
+      this.activeNotebook.activePageIndex--;
+      this.loadActiveNotebookIntoWorkspace();
+      this.scheduleAutoSave();
+    });
+
+    document.getElementById('nextPageBtn').addEventListener('click', () => {
+      if (
+        !this.activeNotebook ||
+        this.activeNotebook.activePageIndex >= this.activeNotebook.pages.length - 1
+      )
+        return;
+      this.activeNotebook.activePageIndex++;
+      this.loadActiveNotebookIntoWorkspace();
+      this.scheduleAutoSave();
+    });
+
+    document.getElementById('addPageBtn').addEventListener('click', () => {
+      this.addNewPageToCurrentNotebook();
+    });
+    document.getElementById('sidebarAddPageBtn').addEventListener('click', () => {
+      this.addNewPageToCurrentNotebook();
+    });
+
+    // Yakınlaştırma (Zoom) Kontrolleri
+    document.getElementById('zoomOutBtn').addEventListener('click', () => {
+      this.engine.setZoom(this.engine.zoom - 0.15);
+    });
+    document.getElementById('zoomInBtn').addEventListener('click', () => {
+      this.engine.setZoom(this.engine.zoom + 0.15);
+    });
+    document.getElementById('zoomResetBtn').addEventListener('click', () => {
+      this.engine.setZoom(1.0);
+    });
+
+    // Zen / Tam Ekran Modu
+    document.getElementById('zenModeBtn').addEventListener('click', () => {
+      appShell.classList.toggle('zen-mode');
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      } else if (appShell.classList.contains('zen-mode')) {
+        document.documentElement.requestFullscreen?.().catch(() => {});
+      }
+    });
+
+    // Kalem Araçları Seçimi
+    document.querySelectorAll('.tool-dock-btn[data-tool]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const selectedTool = btn.dataset.tool;
+        if (selectedTool !== 'pan' && !this.engine.penActive) {
+          this.engine.penActive = true;
+          this.updatePenActiveUI();
+        }
+        this.selectTool(selectedTool);
+      });
+    });
+
+    // Kalınlık Sürgüsü
+    const sizeSlider = document.getElementById('strokeSizeSlider');
+    sizeSlider.addEventListener('input', (e) => {
+      const val = Number(e.target.value);
+      this.engine.strokeSize = val;
+      document.getElementById('strokeSizeValue').textContent = `${val} px`;
+      this.updateQuickWidthDots();
+    });
+
+    document.querySelectorAll('.width-preset-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const size = Number(btn.dataset.size);
+        this.engine.strokeSize = size;
+        sizeSlider.value = size;
+        document.getElementById('strokeSizeValue').textContent = `${size} px`;
+        this.updateQuickWidthDots();
+      });
+    });
+
+    const customColorInput = document.getElementById('customColorPicker');
+    customColorInput.addEventListener('input', (e) => {
+      this.setInkColor(e.target.value);
+    });
+
+    document.getElementById('pressureToggleChk').addEventListener('change', (e) => {
+      this.engine.pressureEnabled = e.target.checked;
+    });
+    document.getElementById('autoShapeToggleChk').addEventListener('change', (e) => {
+      this.engine.autoShapeHold = e.target.checked;
+    });
+
+    document.querySelectorAll('input[name="eraserModeRadio"]').forEach((radio) => {
+      radio.addEventListener('change', (e) => {
+        this.engine.eraserMode = e.target.value;
+      });
+    });
+
+    document.getElementById('clearCurrentPageBtn').addEventListener('click', () => {
+      if (!this.engine.page) return;
+      this.engine.pushUndoSnapshot();
+      this.engine.page.strokes = [];
+      this.engine.page.shapes = [];
+      this.engine.page.textBoxes = [];
+      this.engine.page.images = [];
+      this.engine.page.attachments = [];
+      this.engine.page.audioNotes = [];
+      this.engine.page.bgImageData = null;
+      this.engine.bgImageCache.delete(this.engine.page.id);
+      this.engine.clearSelection();
+      this.engine.renderMain();
+      this.engine.renderDOMOverlays();
+      this.scheduleAutoSave();
+      this.updateUndoRedoButtons();
+      this.showToast('Sayfa temizlendi (Geri Al ile kurtarabilirsiniz).');
+    });
+
+    document.querySelectorAll('.shape-type-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.shape-type-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.engine.shapeType = btn.dataset.shape;
+      });
+    });
+
+    document.getElementById('shapeFillChk').addEventListener('change', (e) => {
+      this.engine.shapeFill = e.target.checked;
+    });
+
+    // Kement Seçim Aksiyon Çubuğu
+    document.getElementById('lassoDuplicateBtn').addEventListener('click', () => {
+      this.engine.duplicateSelection();
+    });
+    document.getElementById('lassoDeleteBtn').addEventListener('click', () => {
+      this.engine.deleteSelection();
+    });
+    document.getElementById('lassoColorInput').addEventListener('input', (e) => {
+      this.engine.recolorSelection(e.target.value);
+    });
+
+    // Kağıt Şablonu ve Rengi Modalı
+    document.getElementById('openTemplateModalBtn').addEventListener('click', () => {
+      this.openTemplateModal();
+    });
+    document.getElementById('closeTemplateModalBtn').addEventListener('click', () => {
+      document.getElementById('templateModal').classList.add('hidden');
+    });
+
+    // İÇERİ EKLE (FOTOĞRAF / PDF / DOSYA) MODALI VE İŞLEYİCİLERİ
+    const importModal = document.getElementById('importModal');
+    const imageFileInput = document.getElementById('imageFileInput');
+    const bgImageFileInput = document.getElementById('bgImageFileInput');
+    const pdfFileInput = document.getElementById('pdfFileInput');
+    const anyFileInput = document.getElementById('anyFileInput');
+
+    document.getElementById('openImportModalBtn').addEventListener('click', () => {
+      importModal.classList.remove('hidden');
+    });
+    document.getElementById('closeImportModalBtn').addEventListener('click', () => {
+      importModal.classList.add('hidden');
+    });
+
+    // 1. Serbest Fotoğraf Ekle
+    document.getElementById('triggerPhotoInsertBtn').addEventListener('click', () => {
+      importModal.classList.add('hidden');
+      imageFileInput.click();
+    });
+    imageFileInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      if (files.length === 0) return;
+      files.forEach((file, idx) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          this.engine.addImageToPage(ev.target.result, idx);
+        };
+        reader.readAsDataURL(file);
+      });
+      this.showToast(`${files.length} fotoğraf sayfaya eklendi.`);
+      imageFileInput.value = '';
+    });
+
+    // 2. Sayfa Arka Planı Fotoğrafı Ekle
+    document.getElementById('triggerBgPhotoInsertBtn').addEventListener('click', () => {
+      importModal.classList.add('hidden');
+      bgImageFileInput.click();
+    });
+    bgImageFileInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        this.engine.setPageBackgroundImage(ev.target.result);
+        this.showToast('Görsel sayfa arka planı olarak ayarlandı.');
+      };
+      reader.readAsDataURL(file);
+      bgImageFileInput.value = '';
+    });
+
+    // 3. PDF Belgesi İçe Aktar
+    document.getElementById('triggerPdfImportBtn').addEventListener('click', () => {
+      importModal.classList.add('hidden');
+      pdfFileInput.click();
+    });
+    pdfFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      await this.handlePdfFileImport(file);
+      pdfFileInput.value = '';
+    });
+
+    // 4. Genel Dosya / Belge Ekle
+    document.getElementById('triggerAnyFileImportBtn').addEventListener('click', () => {
+      importModal.classList.add('hidden');
+      anyFileInput.click();
+    });
+    anyFileInput.addEventListener('change', async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      await this.handleGenericFileImport(file);
+      anyFileInput.value = '';
+    });
+
+    // Dışa Aktar Modalı
+    document.getElementById('openExportModalBtn').addEventListener('click', () => {
+      document.getElementById('exportModal').classList.remove('hidden');
+    });
+    document.getElementById('closeExportModalBtn').addEventListener('click', () => {
+      document.getElementById('exportModal').classList.add('hidden');
+    });
+
+    document.getElementById('exportPdfBtn').addEventListener('click', () => {
+      this.exportCurrentNotebookAsPDF();
+    });
+    document.getElementById('exportPngBtn').addEventListener('click', () => {
+      this.exportCurrentPageAsPNG();
+    });
+    document.getElementById('exportJsonBtn').addEventListener('click', () => {
+      this.exportNotebookBackupJSON();
+    });
+
+    const importJsonInput = document.getElementById('importJsonInput');
+    document.getElementById('importJsonBtn').addEventListener('click', () => {
+      importJsonInput.click();
+    });
+    importJsonInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      this.importJsonBackupFile(file);
+      importJsonInput.value = '';
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.target.isContentEditable || e.target.tagName === 'INPUT') return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) this.engine.redo();
+        else this.engine.undo();
+        this.updateUndoRedoButtons();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        this.engine.redo();
+        this.updateUndoRedoButtons();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (this.engine.selection) {
+          e.preventDefault();
+          this.engine.deleteSelection();
+        }
+      }
+    });
+  }
+
+  /**
+   * DOĞRUDAN SATIRA CANLI SES KAYDI SİSTEMİ (Android Native MediaRecorder Köprüsü + Web MediaRecorder)
+   * Asla dosya seçici açmaz; doğrudan tablet mikrofonundan ilgili satıra kayıt yapar.
+   */
+  isCurrentlyRecording() {
+    return Boolean(
+      this.isNativeRecording || (this.mediaRecorder && this.mediaRecorder.state !== 'inactive')
+    );
+  }
+
+  async startVoiceRecording(opts = {}) {
+    const targetLineY = this.engine.snapYToLine(
+      opts.lineY || this.engine.lastActiveLineY || 116
+    );
+    const rows = this.engine.getPageLineRows();
+    const rowObj = rows.find((r) => Math.abs(r.lineY - targetLineY) <= 8);
+    const lineIndex = opts.lineIndex || (rowObj ? rowObj.index : 1);
+
+    this.recTargetLineY = targetLineY;
+    this.recTargetX = typeof opts.x === 'number' ? opts.x : undefined;
+    this.recLineIndex = lineIndex;
+    this.recCancelled = false;
+    this.isRecPaused = false;
+    this.recElapsedSec = 0;
+
+    // 1. ÖNCELİK: Android APK İçindeki Doğrudan Native Mikrofon Köprüsü (AndroidVoiceBridge)
+    if (window.AndroidVoiceBridge && typeof window.AndroidVoiceBridge.startNativeRecording === 'function') {
+      window.onAndroidMicPermissionResult = (granted) => {
+        if (granted) {
+          this.startVoiceRecording({ lineY: targetLineY, x: this.recTargetX, lineIndex });
+        } else {
+          this.showToast('Mikrofon izni reddedildi. Lütfen izin verip tekrar deneyin.');
+        }
+      };
+
+      const status = window.AndroidVoiceBridge.startNativeRecording();
+      if (status === 'PERMISSION_REQUESTED') {
+        this.showToast('🎙️ Lütfen ekrana gelen mikrofon iznini onaylayın...');
+        return;
+      }
+      if (status === 'OK') {
+        this.isNativeRecording = true;
+        this.activateRecordingUI(targetLineY, lineIndex);
+        return;
+      }
+      this.showToast(`Mikrofon başlatılamadı (${status}).`);
+      return;
+    }
+
+    // 2. Web Tarayıcı MediaRecorder Desteği
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      this.showToast('Bu ortamda doğrudan mikrofon erişimi bulunamadı.');
+      return;
+    }
+
+    try {
+      this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.audioChunks = [];
+
+      const mimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/aac', ''];
+      let options = {};
+      for (const mt of mimeTypes) {
+        if (mt && typeof MediaRecorder.isTypeSupported === 'function' && MediaRecorder.isTypeSupported(mt)) {
+          options = { mimeType: mt };
+          break;
+        }
+      }
+
+      this.mediaRecorder = new MediaRecorder(this.audioStream, options);
+
+      this.mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          this.audioChunks.push(e.data);
+        }
+      };
+
+      this.mediaRecorder.onstop = () => {
+        this.cleanupVoiceStream();
+        if (this.recCancelled || this.audioChunks.length === 0) {
+          return;
+        }
+        const blobType = this.mediaRecorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(this.audioChunks, { type: blobType });
+        const duration = Math.max(1, this.recElapsedSec);
+
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          this.engine.addAudioNoteToPage({
+            title: `Satır ${this.recLineIndex || 1}`,
+            durationSec: duration,
+            dataUrl: ev.target.result,
+            lineY: this.recTargetLineY,
+            x: this.recTargetX
+          });
+          this.showToast(`🎙️ Ses kaydı ${this.recLineIndex || 1}. satıra eklendi!`);
+        };
+        reader.readAsDataURL(audioBlob);
+      };
+
+      this.mediaRecorder.start(250);
+      this.activateRecordingUI(targetLineY, lineIndex);
+    } catch (err) {
+      console.warn('Mikrofon erişim hatası:', err);
+      this.showToast('Mikrofona erişilemedi. Lütfen mikrofon iznini kontrol edin.');
+    }
+  }
+
+  activateRecordingUI(targetLineY, lineIndex) {
+    this.engine.activeRecordingLineY = targetLineY;
+    this.engine.activeRecordingTimeText = '00:00';
+    this.engine.renderDOMOverlays();
+
+    document.getElementById('voiceRecorderBar').classList.remove('hidden');
+    const btn = document.getElementById('voiceRecordBtn');
+    btn.classList.add('recording');
+    const lbl = document.getElementById('voiceRecordBtnLabel');
+    if (lbl) lbl.textContent = `⏹ Kaydı Bitir (Satır ${lineIndex})`;
+
+    document.getElementById('recStateLabel').textContent = `${lineIndex}. Satıra Ses Kaydediliyor...`;
+    document.getElementById('recPauseResumeBtn').textContent = '⏸ Duraklat';
+    document.getElementById('recTimerDisplay').textContent = '00:00';
+
+    clearInterval(this.recTimerInterval);
+    this.recTimerInterval = setInterval(() => {
+      if (!this.isRecPaused) {
+        this.recElapsedSec++;
+        const formatted = this.engine.formatSeconds(this.recElapsedSec);
+        document.getElementById('recTimerDisplay').textContent = formatted;
+        this.engine.activeRecordingTimeText = formatted;
+        const lineTimerEl = this.engine.overlayLayer?.querySelector('.line-rec-timer');
+        if (lineTimerEl) {
+          lineTimerEl.textContent = `Satır ${lineIndex} • ${formatted}`;
+        }
+      }
+    }, 1000);
+
+    this.showToast(`🎙️ ${lineIndex}. satıra ses kaydediliyor... Bitirmek için satırdaki ⏹ butonuna basın.`);
+  }
+
+  togglePauseVoiceRecording() {
+    const pauseBtn = document.getElementById('recPauseResumeBtn');
+    const stateLabel = document.getElementById('recStateLabel');
+    const waveBars = document.getElementById('recWaveBars');
+
+    if (this.isNativeRecording && window.AndroidVoiceBridge) {
+      if (!this.isRecPaused) {
+        window.AndroidVoiceBridge.pauseNativeRecording?.();
+        this.isRecPaused = true;
+        pauseBtn.textContent = '▶ Devam Et';
+        stateLabel.textContent = 'Kayıt Duraklatıldı';
+        waveBars?.classList.add('paused');
+      } else {
+        window.AndroidVoiceBridge.resumeNativeRecording?.();
+        this.isRecPaused = false;
+        pauseBtn.textContent = '⏸ Duraklat';
+        stateLabel.textContent = `${this.recLineIndex || 1}. Satıra Ses Kaydediliyor...`;
+        waveBars?.classList.remove('paused');
+      }
+      return;
+    }
+
+    if (!this.mediaRecorder) return;
+    if (this.mediaRecorder.state === 'recording') {
+      this.mediaRecorder.pause();
+      this.isRecPaused = true;
+      pauseBtn.textContent = '▶ Devam Et';
+      stateLabel.textContent = 'Kayıt Duraklatıldı';
+      waveBars?.classList.add('paused');
+    } else if (this.mediaRecorder.state === 'paused') {
+      this.mediaRecorder.resume();
+      this.isRecPaused = false;
+      pauseBtn.textContent = '⏸ Duraklat';
+      stateLabel.textContent = `${this.recLineIndex || 1}. Satıra Ses Kaydediliyor...`;
+      waveBars?.classList.remove('paused');
+    }
+  }
+
+  stopAndSaveVoiceRecording() {
+    clearInterval(this.recTimerInterval);
+    const duration = Math.max(1, this.recElapsedSec || 1);
+    const lineY = this.recTargetLineY || this.engine.lastActiveLineY || 116;
+    const targetX = this.recTargetX;
+    const lineIndex = this.recLineIndex || 1;
+
+    if (this.isNativeRecording && window.AndroidVoiceBridge) {
+      this.isNativeRecording = false;
+      this.hideVoiceRecorderBar();
+      const dataUrl = window.AndroidVoiceBridge.stopNativeRecording();
+      if (dataUrl && dataUrl.startsWith('data:audio')) {
+        this.engine.addAudioNoteToPage({
+          title: `Satır ${lineIndex}`,
+          durationSec: duration,
+          dataUrl,
+          lineY,
+          x: targetX
+        });
+        this.showToast(`🎙️ Ses kaydı ${lineIndex}. satıra eklendi!`);
+      } else {
+        this.showToast('Ses kaydı tamamlanamadı.');
+      }
+      return;
+    }
+
+    if (!this.mediaRecorder) return;
+    this.recCancelled = false;
+    if (this.mediaRecorder.state !== 'inactive') {
+      this.mediaRecorder.stop();
+    }
+    this.hideVoiceRecorderBar();
+  }
+
+  cancelVoiceRecording() {
+    clearInterval(this.recTimerInterval);
+    this.recCancelled = true;
+    if (this.isNativeRecording && window.AndroidVoiceBridge) {
+      this.isNativeRecording = false;
+      window.AndroidVoiceBridge.cancelNativeRecording?.();
+    }
+    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+      this.mediaRecorder.stop();
+    }
+    this.cleanupVoiceStream();
+    this.hideVoiceRecorderBar();
+    this.showToast('Ses kaydı iptal edildi.');
+  }
+
+  cleanupVoiceStream() {
+    clearInterval(this.recTimerInterval);
+    if (this.audioStream) {
+      this.audioStream.getTracks().forEach((track) => track.stop());
+      this.audioStream = null;
+    }
+  }
+
+  hideVoiceRecorderBar() {
+    this.engine.activeRecordingLineY = null;
+    this.engine.renderDOMOverlays();
+    document.getElementById('voiceRecorderBar').classList.add('hidden');
+    const btn = document.getElementById('voiceRecordBtn');
+    btn.classList.remove('recording');
+    const lbl = document.getElementById('voiceRecordBtnLabel');
+    if (lbl) lbl.textContent = '🎙️ Satıra Kaydet';
+    document.getElementById('recWaveBars')?.classList.remove('paused');
+  }
+
+  /**
+   * PDF Dosyasını Sayfalara Dönüştürüp Not Defterine Aktarma
+   */
+  async handlePdfFileImport(file) {
+    this.showToast(`"${file.name}" PDF belgesi işleniyor...`);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfjsLib = window['pdfjs-dist/build/pdf'] || window.pdfjsLib;
+
+      if (pdfjsLib) {
+        if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+          pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+        const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const totalPages = Math.min(pdfDoc.numPages, 25);
+        const insertedPages = [];
+
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+          const pdfPage = await pdfDoc.getPage(pageNum);
+          const viewport = pdfPage.getViewport({ scale: 1.8 });
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = viewport.width;
+          tempCanvas.height = viewport.height;
+          const tempCtx = tempCanvas.getContext('2d');
+
+          await pdfPage.render({ canvasContext: tempCtx, viewport }).promise;
+          const pageDataUrl = tempCanvas.toDataURL('image/jpeg', 0.9);
+
+          insertedPages.push({
+            id: `pg-pdf-${Date.now()}-${pageNum}`,
+            template: 'blank',
+            paperColor: 'white',
+            bgImageData: pageDataUrl,
+            strokes: [],
+            shapes: [],
+            textBoxes: [],
+            images: [],
+            attachments: [],
+            audioNotes: []
+          });
+        }
+
+        if (insertedPages.length > 0) {
+          const curIdx = this.activeNotebook.activePageIndex || 0;
+          const curPg = this.activeNotebook.pages[curIdx];
+          const isCurPageEmpty =
+            curPg &&
+            curPg.strokes.length === 0 &&
+            curPg.shapes.length === 0 &&
+            curPg.textBoxes.length === 0 &&
+            !curPg.bgImageData;
+
+          if (isCurPageEmpty) {
+            this.activeNotebook.pages.splice(curIdx, 1, ...insertedPages);
+          } else {
+            this.activeNotebook.pages.splice(curIdx + 1, 0, ...insertedPages);
+            this.activeNotebook.activePageIndex = curIdx + 1;
+          }
+
+          this.loadActiveNotebookIntoWorkspace();
+          this.scheduleAutoSave();
+          this.showToast(`PDF (${insertedPages.length} sayfa) başarıyla eklendi! Üzerine yazabilirsiniz.`);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('PDF.js render hatası, dosya kartı olarak ekleniyor:', err);
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      this.engine.addAttachmentToPage({
+        name: file.name,
+        ext: 'PDF',
+        sizeLabel: `${(file.size / 1024).toFixed(1)} KB`,
+        dataUrl: ev.target.result
+      });
+      this.showToast(`"${file.name}" sayfaya PDF kartı olarak eklendi.`);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /**
+   * Herhangi Bir Dosyayı (Görsel, Ses, PDF, TXT/MD, JSON veya Belge) Sayfaya Ekleme
+   */
+  async handleGenericFileImport(file) {
+    const name = file.name || 'dosya';
+    const ext = (name.split('.').pop() || 'DOSYA').toLowerCase();
+
+    if (file.type.startsWith('audio/') || ['mp3', 'm4a', 'wav', 'ogg', 'aac'].includes(ext)) {
+      this.handleAudioFileImport(file);
+      return;
+    }
+
+    if (file.type.startsWith('image/') || ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        this.engine.addImageToPage(ev.target.result);
+        this.showToast(`"${name}" görseli sayfaya eklendi.`);
+      };
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    if (file.type === 'application/pdf' || ext === 'pdf') {
+      await this.handlePdfFileImport(file);
+      return;
+    }
+
+    if (ext === 'json' && name.includes('tabnote')) {
+      this.importJsonBackupFile(file);
+      return;
+    }
+
+    if (file.type.startsWith('text/') || ['txt', 'md', 'csv', 'log'].includes(ext)) {
+      const textContent = await file.text();
+      this.engine.createTextBoxAt(
+        80,
+        120,
+        `📄 ${name}\n────────────────────\n${textContent.slice(0, 3000)}`
+      );
+      this.showToast(`"${name}" metin içeriği sayfaya eklendi.`);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const kb = (file.size / 1024).toFixed(1);
+      this.engine.addAttachmentToPage({
+        name,
+        ext: ext.toUpperCase(),
+        sizeLabel: `${kb} KB`,
+        dataUrl: ev.target.result
+      });
+      this.showToast(`"${name}" dosyası sayfaya eklendi.`);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  importJsonBackupFile(file) {
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const imported = JSON.parse(ev.target.result);
+        if (imported && imported.pages && Array.isArray(imported.pages)) {
+          imported.id = `nb-${Date.now()}`;
+          imported.title = `${imported.title || 'İçe Aktarılan Not'}`;
+          await storage.saveNotebook(imported);
+          this.notebooks = await storage.getAllNotebooks();
+          this.activeNotebook = imported;
+          this.renderSidebar();
+          this.loadActiveNotebookIntoWorkspace();
+          document.getElementById('exportModal').classList.add('hidden');
+          this.showToast('Not defteri başarıyla içe aktarıldı!');
+        }
+      } catch {
+        this.showToast('Geçersiz yedek dosyası.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  selectTool(toolName) {
+    this.engine.tool = toolName;
+
+    if (toolName === 'highlighter') {
+      if (this.engine.strokeSize < 14) {
+        this.engine.strokeSize = 22;
+      }
+      if (!HIGHLIGHTER_PALETTE.includes(this.engine.color)) {
+        this.engine.color = HIGHLIGHTER_PALETTE[0];
+      }
+    } else if (['fountain', 'ballpoint', 'pencil'].includes(toolName)) {
+      if (this.engine.strokeSize > 16) {
+        this.engine.strokeSize = 4;
+      }
+      if (HIGHLIGHTER_PALETTE.includes(this.engine.color)) {
+        this.engine.color = INK_PALETTE[0];
+      }
+    }
+
+    document.getElementById('strokeSizeSlider').value = this.engine.strokeSize;
+    document.getElementById('strokeSizeValue').textContent = `${this.engine.strokeSize} px`;
+
+    document.getElementById('eraserSubPanel').classList.toggle('hidden', toolName !== 'eraser');
+    document.getElementById('shapeSubPanel').classList.toggle('hidden', toolName !== 'shape');
+
+    this.updatePenToolbarUI();
+  }
+
+  setInkColor(hex) {
+    this.engine.color = hex;
+    document.getElementById('customColorPicker').value = hex;
+    this.updatePenToolbarUI();
+  }
+
+  updatePenToolbarUI() {
+    document.querySelectorAll('.tool-dock-btn[data-tool]').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.tool === this.engine.tool);
+    });
+
+    document.querySelectorAll('.dynamic-ink-nib').forEach((el) => {
+      el.style.fill = this.engine.color;
+      el.style.stroke = this.engine.color;
+    });
+
+    const paletteContainer = document.getElementById('colorSwatchesContainer');
+    paletteContainer.innerHTML = '';
+    const palette =
+      this.engine.tool === 'highlighter' ? HIGHLIGHTER_PALETTE : INK_PALETTE;
+
+    for (const hex of palette) {
+      const swatch = document.createElement('button');
+      swatch.type = 'button';
+      swatch.className = 'color-swatch-btn';
+      if (hex.toLowerCase() === this.engine.color.toLowerCase()) {
+        swatch.classList.add('active');
+      }
+      swatch.style.backgroundColor = hex;
+      if (hex.toLowerCase() === '#f8fafc') {
+        swatch.style.border = '1px solid #64748B';
+      }
+      swatch.title = `Mürekkep Rengi: ${hex}`;
+      swatch.addEventListener('click', () => this.setInkColor(hex));
+      paletteContainer.appendChild(swatch);
+    }
+
+    this.updateQuickWidthDots();
+  }
+
+  updateQuickWidthDots() {
+    document.querySelectorAll('.width-preset-btn').forEach((btn) => {
+      const s = Number(btn.dataset.size);
+      btn.classList.toggle('active', Math.abs(s - this.engine.strokeSize) <= 1.5);
+    });
+  }
+
+  renderSidebar() {
+    const folderListEl = document.getElementById('folderListContainer');
+    folderListEl.innerHTML = '';
+
+    for (const fld of this.folders) {
+      const count = this.getNotebooksForFolder(fld.id).length;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = `folder-nav-item ${this.activeFolderId === fld.id ? 'active' : ''}`;
+      item.innerHTML = `
+        <span class="folder-dot" style="background:${fld.color}"></span>
+        <span class="folder-name">${this.escapeHtml(fld.name)}</span>
+        <span class="folder-count">${count}</span>
+      `;
+      item.addEventListener('click', () => {
+        this.activeFolderId = fld.id;
+        this.renderSidebar();
+      });
+      folderListEl.appendChild(item);
+    }
+
+    this.renderNotebookList();
+  }
+
+  getNotebooksForFolder(folderId) {
+    return this.notebooks.filter((nb) => {
+      if (folderId === 'all') return true;
+      if (folderId === 'favorites') return !!nb.favorite;
+      return nb.folderId === folderId;
+    });
+  }
+
+  renderNotebookList() {
+    const listEl = document.getElementById('notebookCardsContainer');
+    listEl.innerHTML = '';
+
+    let filtered = this.getNotebooksForFolder(this.activeFolderId);
+    if (this.searchQuery) {
+      filtered = filtered.filter((nb) => {
+        const inTitle = (nb.title || '').toLowerCase().includes(this.searchQuery);
+        const inText = (nb.pages || []).some((pg) =>
+          (pg.textBoxes || []).some((tb) => (tb.text || '').toLowerCase().includes(this.searchQuery))
+        );
+        return inTitle || inText;
+      });
+    }
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = `
+        <div class="empty-notebooks-state">
+          <p>Bu klasörde henüz not defteri yok.</p>
+          <button type="button" class="btn-secondary-sm" id="emptyCreateNbBtn">+ Yeni Not Defteri Aç</button>
+        </div>
+      `;
+      document.getElementById('emptyCreateNbBtn')?.addEventListener('click', () => {
+        this.createNewNotebook();
+      });
+      return;
+    }
+
+    for (const nb of filtered) {
+      const card = document.createElement('div');
+      card.className = `notebook-card ${this.activeNotebook?.id === nb.id ? 'active' : ''}`;
+
+      const folderObj =
+        this.folders.find((f) => f.id === nb.folderId) ||
+        this.folders.find((f) => !f.system) ||
+        this.folders[0];
+      const dateStr = new Date(nb.updatedAt || Date.now()).toLocaleDateString('tr-TR', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      card.innerHTML = `
+        <div class="nb-card-spine" style="background:${nb.coverColor || folderObj.color}"></div>
+        <div class="nb-card-body">
+          <div class="nb-card-top">
+            <h4 class="nb-card-title">${this.escapeHtml(nb.title || 'Adsız Not Defteri')}</h4>
+            ${nb.favorite ? '<span class="nb-fav-star" title="Favori">★</span>' : ''}
+          </div>
+          <div class="nb-card-meta">
+            <span class="nb-folder-tag">${this.escapeHtml(folderObj.name)}</span>
+            <span>• ${nb.pages?.length || 1} sayfa</span>
+            <span>• ${dateStr}</span>
+          </div>
+        </div>
+        <button type="button" class="nb-card-del-btn" title="Not Defterini Sil">🗑</button>
+      `;
+
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.nb-card-del-btn')) return;
+        this.activeNotebook = nb;
+        this.renderNotebookList();
+        this.loadActiveNotebookIntoWorkspace();
+      });
+
+      card.querySelector('.nb-card-del-btn').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (this.notebooks.length <= 1) {
+          this.showToast('En az bir not defteri kalmalıdır.');
+          return;
+        }
+        await storage.deleteNotebook(nb.id);
+        this.notebooks = await storage.getAllNotebooks();
+        if (this.activeNotebook?.id === nb.id) {
+          this.activeNotebook = this.notebooks[0];
+          this.loadActiveNotebookIntoWorkspace();
+        }
+        this.renderSidebar();
+        this.showToast('Not defteri silindi.');
+      });
+
+      listEl.appendChild(card);
+    }
+  }
+
+  renderPageThumbnails() {
+    const container = document.getElementById('pageThumbnailsGrid');
+    if (!container || !this.activeNotebook) return;
+    container.innerHTML = '';
+
+    this.activeNotebook.pages.forEach((pg, index) => {
+      const card = document.createElement('div');
+      card.className = `page-thumb-card ${
+        index === this.activeNotebook.activePageIndex ? 'active' : ''
+      }`;
+
+      const thumbCanvas = document.createElement('canvas');
+      thumbCanvas.width = 180;
+      thumbCanvas.height = 248;
+      const tCtx = thumbCanvas.getContext('2d');
+      const scale = 180 / PAGE_WIDTH;
+      tCtx.scale(scale, scale);
+
+      const bgImg = this.engine.bgImageCache.get(pg.id) || null;
+      renderPaperBackground(
+        tCtx,
+        PAGE_WIDTH,
+        PAGE_HEIGHT,
+        pg.template || 'ruled',
+        pg.paperColor || 'ivory',
+        bgImg
+      );
+
+      for (const st of pg.strokes || []) {
+        this.engine.drawStroke(tCtx, st);
+      }
+      for (const sh of pg.shapes || []) {
+        this.engine.drawGeometricShape(tCtx, sh);
+      }
+
+      const footer = document.createElement('div');
+      footer.className = 'page-thumb-footer';
+      footer.innerHTML = `
+        <span class="page-thumb-num">Sayfa ${index + 1}</span>
+        <div class="page-thumb-actions">
+          <button type="button" class="thumb-act-btn dup" title="Sayfayı Çoğalt">⧉</button>
+          <button type="button" class="thumb-act-btn del" title="Sayfayı Sil">✕</button>
+        </div>
+      `;
+
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.thumb-act-btn')) return;
+        this.activeNotebook.activePageIndex = index;
+        this.loadActiveNotebookIntoWorkspace();
+      });
+
+      footer.querySelector('.dup').addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cloned = JSON.parse(JSON.stringify(pg));
+        cloned.id = `pg-${Date.now()}`;
+        this.activeNotebook.pages.splice(index + 1, 0, cloned);
+        this.activeNotebook.activePageIndex = index + 1;
+        this.loadActiveNotebookIntoWorkspace();
+        this.scheduleAutoSave();
+        this.showToast(`Sayfa ${index + 1} çoğaltıldı.`);
+      });
+
+      footer.querySelector('.del').addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.activeNotebook.pages.length <= 1) {
+          this.showToast('Not defterinde en az 1 sayfa bulunmalıdır.');
+          return;
+        }
+        this.activeNotebook.pages.splice(index, 1);
+        this.activeNotebook.activePageIndex = Math.max(
+          0,
+          Math.min(this.activeNotebook.activePageIndex, this.activeNotebook.pages.length - 1)
+        );
+        this.loadActiveNotebookIntoWorkspace();
+        this.scheduleAutoSave();
+        this.showToast('Sayfa silindi.');
+      });
+
+      card.append(thumbCanvas, footer);
+      container.appendChild(card);
+    });
+  }
+
+  async createNewNotebook() {
+    const targetFolder =
+      this.activeFolderId === 'all' || this.activeFolderId === 'favorites'
+        ? 'study'
+        : this.activeFolderId;
+
+    const colors = ['#2563EB', '#059669', '#8B5CF6', '#EC4899', '#D97706'];
+    const newNb = {
+      id: `nb-${Date.now()}`,
+      title: `Yeni Not Defteri ${this.notebooks.length + 1}`,
+      folderId: targetFolder,
+      favorite: this.activeFolderId === 'favorites',
+      coverColor: colors[this.notebooks.length % colors.length],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      activePageIndex: 0,
+      pages: [
+        {
+          id: `pg-${Date.now()}`,
+          template: 'ruled',
+          paperColor: 'ivory',
+          bgImageData: null,
+          strokes: [],
+          shapes: [],
+          textBoxes: [],
+          images: [],
+          attachments: [],
+          audioNotes: []
+        }
+      ]
+    };
+
+    await storage.saveNotebook(newNb);
+    this.notebooks = await storage.getAllNotebooks();
+    this.activeNotebook = newNb;
+    this.renderSidebar();
+    this.loadActiveNotebookIntoWorkspace();
+    this.showToast('Yeni not defteri açıldı.');
+  }
+
+  addNewPageToCurrentNotebook() {
+    if (!this.activeNotebook) return;
+    const currentPg =
+      this.activeNotebook.pages[this.activeNotebook.activePageIndex] ||
+      this.activeNotebook.pages[0];
+
+    const newPage = {
+      id: `pg-${Date.now()}`,
+      template: currentPg?.template || 'ruled',
+      paperColor: currentPg?.paperColor || 'ivory',
+      bgImageData: null,
+      strokes: [],
+      shapes: [],
+      textBoxes: [],
+      images: [],
+      attachments: [],
+      audioNotes: []
+    };
+
+    const insertIdx = (this.activeNotebook.activePageIndex || 0) + 1;
+    this.activeNotebook.pages.splice(insertIdx, 0, newPage);
+    this.activeNotebook.activePageIndex = insertIdx;
+    this.loadActiveNotebookIntoWorkspace();
+    this.scheduleAutoSave();
+    this.showToast(`Sayfa ${insertIdx + 1} eklendi.`);
+  }
+
+  openTemplateModal() {
+    const modal = document.getElementById('templateModal');
+    const colorGrid = document.getElementById('paperColorsGrid');
+    const templateGrid = document.getElementById('paperTemplatesGrid');
+    if (!this.engine.page) return;
+
+    const currentPage = this.engine.page;
+
+    const renderModalChoices = () => {
+      colorGrid.innerHTML = '';
+      for (const c of PAPER_COLORS) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `paper-color-choice ${currentPage.paperColor === c.id ? 'active' : ''}`;
+        btn.innerHTML = `
+          <span class="paper-color-preview" style="background:${c.bg}; border-color:${c.line}"></span>
+          <span class="paper-color-name">${c.name}</span>
+        `;
+        btn.addEventListener('click', () => {
+          currentPage.paperColor = c.id;
+          if (c.isDark && this.engine.color.toLowerCase() === '#0f172a') {
+            this.setInkColor('#F8FAFC');
+          } else if (!c.isDark && this.engine.color.toLowerCase() === '#f8fafc') {
+            this.setInkColor('#0F172A');
+          }
+          this.engine.renderMain();
+          this.scheduleAutoSave();
+          renderModalChoices();
+        });
+        colorGrid.appendChild(btn);
+      }
+
+      templateGrid.innerHTML = '';
+      for (const tpl of PAPER_TEMPLATES) {
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `template-choice-card ${currentPage.template === tpl.id ? 'active' : ''}`;
+
+        const miniCanvas = document.createElement('canvas');
+        miniCanvas.width = 150;
+        miniCanvas.height = 190;
+        const mCtx = miniCanvas.getContext('2d');
+        mCtx.scale(0.32, 0.32);
+        renderPaperBackground(mCtx, 470, 600, tpl.id, currentPage.paperColor || 'ivory');
+
+        const info = document.createElement('div');
+        info.className = 'template-choice-info';
+        info.innerHTML = `
+          <strong>${tpl.name}</strong>
+          <span>${tpl.desc}</span>
+        `;
+
+        card.append(miniCanvas, info);
+        card.addEventListener('click', () => {
+          currentPage.template = tpl.id;
+          this.engine.renderMain();
+          this.scheduleAutoSave();
+          renderModalChoices();
+        });
+        templateGrid.appendChild(card);
+      }
+    };
+
+    renderModalChoices();
+    modal.classList.remove('hidden');
+  }
+
+  async exportCurrentPageAsPNG() {
+    if (!this.engine.page || !this.activeNotebook) return;
+    this.showToast('Yüksek çözünürlüklü PNG hazırlanıyor...');
+    const outCanvas = await this.engine.renderPageToExportCanvas(this.engine.page, 2);
+    const link = document.createElement('a');
+    const safeName = (this.activeNotebook.title || 'tabnote').replace(/[^a-z0-9ğüşıöç]/gi, '_');
+    link.download = `${safeName}_sayfa_${(this.activeNotebook.activePageIndex || 0) + 1}.png`;
+    link.href = outCanvas.toDataURL('image/png');
+    link.click();
+    document.getElementById('exportModal').classList.add('hidden');
+    this.showToast('PNG görseli indirildi!');
+  }
+
+  async exportCurrentNotebookAsPDF() {
+    if (!this.activeNotebook) return;
+    this.showToast('Tüm sayfalar PDF belgesine dönüştürülüyor...');
+
+    const jspdfNS = window.jspdf;
+    if (jspdfNS && jspdfNS.jsPDF) {
+      const pdf = new jspdfNS.jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [PAGE_WIDTH, PAGE_HEIGHT]
+      });
+
+      for (let i = 0; i < this.activeNotebook.pages.length; i++) {
+        if (i > 0) pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT], 'portrait');
+        const pg = this.activeNotebook.pages[i];
+        const canvas = await this.engine.renderPageToExportCanvas(pg, 2);
+        const imgData = canvas.toDataURL('image/jpeg', 0.94);
+        pdf.addImage(imgData, 'JPEG', 0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+      }
+
+      const safeName = (this.activeNotebook.title || 'TabNote_Notlar').replace(
+        /[^a-z0-9ğüşıöç_-]/gi,
+        '_'
+      );
+      pdf.save(`${safeName}.pdf`);
+      document.getElementById('exportModal').classList.add('hidden');
+      this.showToast('Çok sayfalı PDF başarıyla indirildi!');
+    } else {
+      window.print();
+    }
+  }
+
+  exportNotebookBackupJSON() {
+    if (!this.activeNotebook) return;
+    const dataStr = JSON.stringify(this.activeNotebook, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = (this.activeNotebook.title || 'tabnote').replace(/[^a-z0-9ğüşıöç]/gi, '_');
+    a.href = url;
+    a.download = `${safeName}.tabnote.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    document.getElementById('exportModal').classList.add('hidden');
+    this.showToast('Not defteri yedek dosyası indirildi.');
+  }
+
+  openPromptModal({ title, placeholder, defaultValue, onConfirm }) {
+    const modal = document.getElementById('promptModal');
+    const titleEl = document.getElementById('promptModalTitle');
+    const inputEl = document.getElementById('promptModalInput');
+    const confirmBtn = document.getElementById('promptModalConfirmBtn');
+    const cancelBtn = document.getElementById('promptModalCancelBtn');
+
+    titleEl.textContent = title;
+    inputEl.placeholder = placeholder || '';
+    inputEl.value = defaultValue || '';
+    modal.classList.remove('hidden');
+    setTimeout(() => inputEl.focus(), 40);
+
+    const cleanup = () => {
+      modal.classList.add('hidden');
+      confirmBtn.onclick = null;
+      cancelBtn.onclick = null;
+      inputEl.onkeydown = null;
+    };
+
+    confirmBtn.onclick = () => {
+      const val = inputEl.value;
+      cleanup();
+      onConfirm(val);
+    };
+    cancelBtn.onclick = cleanup;
+    inputEl.onkeydown = (e) => {
+      if (e.key === 'Enter') confirmBtn.click();
+      if (e.key === 'Escape') cleanup();
+    };
+  }
+
+  showToast(msg) {
+    const toast = document.getElementById('statusToast');
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.classList.add('visible');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => {
+      toast.classList.remove('visible');
+    }, 2800);
+  }
+
+  registerServiceWorker() {
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+  }
+
+  escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const app = new TabNoteApp();
+  app.init();
+});
