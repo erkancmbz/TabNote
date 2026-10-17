@@ -313,7 +313,11 @@ export class CanvasEngine {
     surface.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
 
     this.viewportEl.addEventListener('pointerdown', (e) => {
-      if (e.target === this.viewportEl || e.target === this.pageWrapperEl) {
+      if (
+        e.target === this.viewportEl ||
+        e.target === this.pageWrapperEl ||
+        e.target === this.paperContainerEl
+      ) {
         this.isPanning = true;
         this.activePointerId = e.pointerId;
         this.panStart = {
@@ -326,7 +330,7 @@ export class CanvasEngine {
     });
 
     window.addEventListener('pointermove', (e) => {
-      if (this.isPanning && e.pointerId === this.activePointerId && e.target !== this.liveCanvas) {
+      if (this.isPanning && e.pointerId === this.activePointerId && this.panStart) {
         const dx = e.clientX - this.panStart.x;
         const dy = e.clientY - this.panStart.y;
         this.viewportEl.scrollLeft = this.panStart.scrollLeft - dx;
@@ -335,11 +339,58 @@ export class CanvasEngine {
     });
 
     window.addEventListener('pointerup', (e) => {
-      if (this.isPanning && e.pointerId === this.activePointerId && e.target !== this.liveCanvas) {
+      if (this.isPanning && e.pointerId === this.activePointerId) {
         this.isPanning = false;
         this.activePointerId = null;
       }
     });
+
+    // Android WebView için ek doğrudan dokunmatik (touch) dikey+yatay kaydırma güvencesi
+    this.viewportEl.addEventListener(
+      'touchstart',
+      (e) => {
+        if (e.touches.length === 1) {
+          const shouldPan = !this.penActive || this.tool === 'pan' || this.fingerScrollMode;
+          if (shouldPan) {
+            const t = e.touches[0];
+            this.touchPanStart = {
+              x: t.clientX,
+              y: t.clientY,
+              scrollLeft: this.viewportEl.scrollLeft,
+              scrollTop: this.viewportEl.scrollTop
+            };
+          } else {
+            this.touchPanStart = null;
+          }
+        } else {
+          this.touchPanStart = null;
+        }
+      },
+      { passive: true }
+    );
+
+    this.viewportEl.addEventListener(
+      'touchmove',
+      (e) => {
+        if (this.touchPanStart && e.touches.length === 1 && !this.isDrawing) {
+          const t = e.touches[0];
+          const dx = t.clientX - this.touchPanStart.x;
+          const dy = t.clientY - this.touchPanStart.y;
+          this.viewportEl.scrollLeft = this.touchPanStart.scrollLeft - dx;
+          this.viewportEl.scrollTop = this.touchPanStart.scrollTop - dy;
+          if (e.cancelable) e.preventDefault();
+        }
+      },
+      { passive: false }
+    );
+
+    this.viewportEl.addEventListener(
+      'touchend',
+      () => {
+        this.touchPanStart = null;
+      },
+      { passive: true }
+    );
 
     this.viewportEl.addEventListener(
       'wheel',
@@ -407,6 +458,7 @@ export class CanvasEngine {
       return;
     }
 
+    this.touchPanStart = null;
     try {
       this.liveCanvas.setPointerCapture(e.pointerId);
     } catch {}
