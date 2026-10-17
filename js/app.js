@@ -81,6 +81,9 @@ class TabNoteApp {
 
   showHomeScreen() {
     this.isHomeView = true;
+    if (this.activeNotebook) {
+      storage.saveNotebook(this.activeNotebook).catch(() => {});
+    }
     document.getElementById('homeScreenView')?.classList.remove('hidden');
     document.getElementById('appShell')?.classList.add('hidden');
     this.renderHomeScreen();
@@ -106,9 +109,6 @@ class TabNoteApp {
       overlayLayer: document.getElementById('domOverlayLayer'),
       selectionToolbarEl: document.getElementById('lassoActionBar'),
       onChange: () => {
-        if (this.activeNotebook) {
-          this.syncPagePreviewSlot(this.activeNotebook.activePageIndex || 0);
-        }
         this.scheduleAutoSave();
         this.updateUndoRedoButtons();
       },
@@ -181,15 +181,13 @@ class TabNoteApp {
     } else {
       btn.classList.remove('is-active');
       btn.classList.add('is-inactive');
-      txt.textContent = 'Kalem Aktif Değil';
-      if (hudTxt) hudTxt.textContent = 'Kalem Aktif Değil (Kaydırma Modu)';
+      txt.textContent = 'Kalem Aktif';
+      if (hudTxt) hudTxt.textContent = 'Kalem Pasif (Kaydırma Modu)';
     }
 
     if (fingerBtn) {
       fingerBtn.classList.toggle('active', this.engine.fingerScrollMode);
-      fingerBtn.querySelector('span').textContent = this.engine.fingerScrollMode
-        ? '👆 Parmak Kaydırır'
-        : '👆 Parmak Çizer';
+      fingerBtn.querySelector('span').textContent = '👆 Parmakla Kaydır';
     }
   }
 
@@ -394,25 +392,29 @@ class TabNoteApp {
   }
 
   scheduleAutoSave() {
-    const statusEl = document.getElementById('saveStatusBadge');
-    statusEl.textContent = 'Kaydediliyor...';
-    statusEl.classList.add('saving');
-
     clearTimeout(this.saveDebounce);
     this.saveDebounce = setTimeout(async () => {
+      // Kullanıcı o an kalemle çizim yapıyorsa kaydı ertele, asla çizimi bölme!
+      if (this.engine?.isDrawing) {
+        this.scheduleAutoSave();
+        return;
+      }
       if (this.activeNotebook) {
         await storage.saveNotebook(this.activeNotebook);
-        statusEl.textContent = 'Kaydedildi';
-        statusEl.classList.remove('saving');
-        this.renderNotebookList();
+        const statusEl = document.getElementById('saveStatusBadge');
+        if (statusEl) {
+          statusEl.textContent = 'Kaydedildi';
+          statusEl.classList.remove('saving', 'fade-out');
+          clearTimeout(this.saveBadgeFadeTimer);
+          this.saveBadgeFadeTimer = setTimeout(() => {
+            statusEl.classList.add('fade-out');
+          }, 1200);
+        }
         if (this.isHomeView) {
           this.renderHomeScreen();
         }
-        if (this.sidebarTab === 'pages') {
-          this.renderPageThumbnails();
-        }
       }
-    }, 380);
+    }, 1100);
   }
 
   promptCreateNewFolder() {

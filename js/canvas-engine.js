@@ -143,6 +143,17 @@ export class CanvasEngine {
 
     this.mainCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.liveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    // Kağıt arka planını önbelleğe almak için offscreen canvas (sıfır gecikmeli çizim için)
+    this.paperBgCanvas = document.createElement('canvas');
+    this.paperBgCanvas.width = PAGE_WIDTH * dpr;
+    this.paperBgCanvas.height = PAGE_HEIGHT * dpr;
+    this.paperBgCtx = this.paperBgCanvas.getContext('2d');
+    this.paperBgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    this.paperBgCacheKey = null;
+
+    this.activeCanvasRect = null;
+    this.lastPressureHudTime = 0;
   }
 
   loadPage(pageObj) {
@@ -166,6 +177,7 @@ export class CanvasEngine {
         const img = new Image();
         img.onload = () => {
           this.bgImageCache.set(pageObj.id, img);
+          this.paperBgCacheKey = null;
           if (this.page?.id === pageObj.id) {
             this.renderMain();
           }
@@ -176,6 +188,7 @@ export class CanvasEngine {
       this.bgImageCache.delete(pageObj.id);
     }
 
+    this.paperBgCacheKey = null;
     this.renderMain();
     this.renderLive();
     this.renderDOMOverlays();
@@ -189,30 +202,72 @@ export class CanvasEngine {
     const img = new Image();
     img.onload = () => {
       this.bgImageCache.set(targetPage.id, img);
+      this.paperBgCacheKey = null;
       this.renderMain();
       this.onChange();
     };
     img.src = dataUrl;
   }
 
-  pushUndoSnapshot() {
-    if (!this.page) return;
-    const stack = this.undoStacks.get(this.page.id) || [];
-    const snapshot = JSON.stringify({
-      strokes: this.page.strokes,
-      shapes: this.page.shapes,
-      textBoxes: this.page.textBoxes,
-      images: this.page.images,
-      attachments: this.page.attachments,
-      audioNotes: this.page.audioNotes,
+  /**
+   * Hızlı Yapısal Anlık Görüntü (Base64 PDF/Görsel/Ses verilerini JSON.stringify ile kopyalamadan referansla tutar)
+   */
+  createPageSnapshot(fastAppendOnly = false) {
+    if (!this.page) return null;
+    return {
+      strokes: fastAppendOnly
+        ? [...(this.page.strokes || [])]
+        : (this.page.strokes || []).map((st) => ({
+            ...st,
+            points: st.points.map((pt) => ({ x: pt.x, y: pt.y, p: pt.p }))
+          })),
+      shapes: fastAppendOnly
+        ? [...(this.page.shapes || [])]
+        : (this.page.shapes || []).map((sh) => ({ ...sh })),
+      textBoxes: (this.page.textBoxes || []).map((tb) => ({ ...tb })),
+      images: (this.page.images || []).map((im) => ({ ...im })),
+      attachments: (this.page.attachments || []).map((at) => ({ ...at })),
+      audioNotes: (this.page.audioNotes || []).map((au) => ({ ...au })),
       template: this.page.template,
       paperColor: this.page.paperColor,
       bgImageData: this.page.bgImageData
-    });
-    stack.push(snapshot);
-    if (stack.length > 40) stack.shift();
-    this.undoStacks.set(this.page.id, stack);
-    this.redoStacks.set(this.page.id, []);
+    };
+  }
+
+  applyPageSnapshot(snap) {
+    if (!this.page || !snap) return;
+    this.page.strokes = (snap.strokes || []).map((st) => ({
+      ...st,
+      points: st.points.map((pt) => ({ x: pt.x, y: pt.y, p: pt.p }))
+    }));
+    this.page.shapes = (snap.shapes || []).map((sh) => ({ ...sh }));
+    this.page.textBoxes = (snap.textBoxes || []).map((tb) => ({ ...tb }));
+    this.page.images = (snap.images || []).map((im) => ({ ...im }));
+    this.page.attachments = (snap.attachments || []).map((at) => ({ ...at }));
+    this.page.audioNotes = (snap.audioNotes || []).map((au) => ({ ...au }));
+    this.page.template = snap.template;
+    this.page.paperColor = snap.paperColor;
+    this.page.bgImageData = snap.bgImageData;
+    this.paperBgCacheKey = null;
+  }
+
+  pushUndoSnapshot(fastAppendOnly = false) {
+    if (!this.page) return;
+    const stack = this.undoStacks.get(this.page.id) || [];
+    const snapshot = this.createPageSnapshot(fastAppendOnly);
+    if (!fastAppendOnly) {
+      this.page.strokes = (this.page.strokes || []).map((st) => ({
+        ...st,
+        points: st.points.map((pt) => ({ x: pt.x, y: pt.y, p: pt.p }))
+      }));
+      this.page.shapes = (this.page.shapes || []).map((sh) => ({ ...sh }));
+    }
+    if (snapshot) {
+      stack.push(snapshot);
+      if (stack.length > 35) stack.shift();
+      this.undoStacks.set(this.page.id, stack);
+      this.redoStacks.set(this.page.id, []);
+    }
   }
 
   undo() {
@@ -221,23 +276,12 @@ export class CanvasEngine {
     if (undoStack.length === 0) return false;
 
     const redoStack = this.redoStacks.get(this.page.id) || [];
-    redoStack.push(
-      JSON.stringify({
-        strokes: this.page.strokes,
-        shapes: this.page.shapes,
-        textBoxes: this.page.textBoxes,
-        images: this.page.images,
-        attachments: this.page.attachments,
-        audioNotes: this.page.audioNotes,
-        template: this.page.template,
-        paperColor: this.page.paperColor,
-        bgImageData: this.page.bgImageData
-      })
-    );
+    const currentSnap = this.createPageSnapshot();
+    if (currentSnap) redoStack.push(currentSnap);
     this.redoStacks.set(this.page.id, redoStack);
 
-    const prev = JSON.parse(undoStack.pop());
-    Object.assign(this.page, prev);
+    const prev = undoStack.pop();
+    this.applyPageSnapshot(prev);
     this.loadPage(this.page);
     this.onChange();
     return true;
@@ -249,23 +293,12 @@ export class CanvasEngine {
     if (redoStack.length === 0) return false;
 
     const undoStack = this.undoStacks.get(this.page.id) || [];
-    undoStack.push(
-      JSON.stringify({
-        strokes: this.page.strokes,
-        shapes: this.page.shapes,
-        textBoxes: this.page.textBoxes,
-        images: this.page.images,
-        attachments: this.page.attachments,
-        audioNotes: this.page.audioNotes,
-        template: this.page.template,
-        paperColor: this.page.paperColor,
-        bgImageData: this.page.bgImageData
-      })
-    );
+    const currentSnap = this.createPageSnapshot();
+    if (currentSnap) undoStack.push(currentSnap);
     this.undoStacks.set(this.page.id, undoStack);
 
-    const next = JSON.parse(redoStack.pop());
-    Object.assign(this.page, next);
+    const next = redoStack.pop();
+    this.applyPageSnapshot(next);
     this.loadPage(this.page);
     this.onChange();
     return true;
@@ -286,12 +319,14 @@ export class CanvasEngine {
     this.pageWrapperEl.style.transform = `scale(${this.zoom})`;
     this.pageWrapperEl.style.transformOrigin = 'top center';
     this.pageWrapperEl.style.marginBottom = `${Math.max(420, (this.zoom - 1) * PAGE_HEIGHT + 420)}px`;
+    this.activeCanvasRect = null;
     this.updateSelectionToolbarPosition();
     this.onStatusUpdate({ zoom: Math.round(this.zoom * 100) });
   }
 
   scrollByOffset(dx, dy, smooth = false) {
     if (!this.viewportEl) return;
+    this.activeCanvasRect = null;
     if (smooth && typeof this.viewportEl.scrollBy === 'function') {
       this.viewportEl.scrollBy({ left: dx, top: dy, behavior: 'smooth' });
     } else {
@@ -301,7 +336,10 @@ export class CanvasEngine {
   }
 
   getCanvasCoords(clientX, clientY) {
-    const rect = this.liveCanvas.getBoundingClientRect();
+    const rect =
+      this.isDrawing && this.activeCanvasRect
+        ? this.activeCanvasRect
+        : this.liveCanvas.getBoundingClientRect();
     const x = (clientX - rect.left) * (PAGE_WIDTH / rect.width);
     const y = (clientY - rect.top) * (PAGE_HEIGHT / rect.height);
     return {
@@ -576,9 +614,11 @@ export class CanvasEngine {
 
     this.tempBarrelEraser = e.pointerType === 'pen' && (e.buttons === 32 || e.button === 5);
 
+    this.activeCanvasRect = this.liveCanvas.getBoundingClientRect();
     this.isDrawing = true;
     this.activePointerId = e.pointerId;
     this.snappedShapePreview = null;
+    this.lastLivePointIndex = 0;
 
     const pressure = this.computePressure(e, null);
     const point = {
@@ -593,7 +633,7 @@ export class CanvasEngine {
     const effectiveTool = this.tempBarrelEraser ? 'eraser' : this.tool;
 
     if (effectiveTool === 'eraser') {
-      this.pushUndoSnapshot();
+      this.pushUndoSnapshot(false);
       this.eraseAtPoint(point.x, point.y);
       this.renderLive({ eraserCursor: point });
       return;
@@ -615,6 +655,7 @@ export class CanvasEngine {
     this.currentPoints = [point];
     this.scheduleAutoShapeHold();
     this.renderLive();
+    this.lastLivePointIndex = 1;
   }
 
   handlePointerMove(e) {
@@ -670,20 +711,21 @@ export class CanvasEngine {
     const effectiveTool = this.tempBarrelEraser ? 'eraser' : this.tool;
     const events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [e];
     const sampleList = events.length > 0 ? events : [e];
+    const now = performance.now();
 
     for (const ev of sampleList) {
       const pt = this.getCanvasCoords(ev.clientX, ev.clientY);
       const prevPt = this.currentPoints[this.currentPoints.length - 1] || null;
       const pressure = this.computePressure(
         ev,
-        prevPt ? { x: pt.x, y: pt.y, prev: prevPt, t: performance.now() } : null
+        prevPt ? { x: pt.x, y: pt.y, prev: prevPt, t: now } : null
       );
 
       const newPoint = {
         x: pt.x,
         y: pt.y,
         p: pressure,
-        t: performance.now(),
+        t: now,
         tiltX: ev.tiltX || 0,
         tiltY: ev.tiltY || 0
       };
@@ -696,18 +738,17 @@ export class CanvasEngine {
 
       if (effectiveTool === 'lasso') {
         this.lassoPolygon.push(newPoint);
-        this.renderLive();
         continue;
       }
 
       if (effectiveTool === 'laser') {
         this.currentPoints.push(newPoint);
         const activeTrail = this.laserTrails[this.laserTrails.length - 1];
-        if (activeTrail) activeTrail.lastUpdated = performance.now();
+        if (activeTrail) activeTrail.lastUpdated = now;
         continue;
       }
 
-      if (prevPt && Math.hypot(newPoint.x - prevPt.x, newPoint.y - prevPt.y) < 1.2) {
+      if (prevPt && Math.hypot(newPoint.x - prevPt.x, newPoint.y - prevPt.y) < 1.1) {
         continue;
       }
 
@@ -720,9 +761,34 @@ export class CanvasEngine {
       }
     }
 
-    if (effectiveTool !== 'eraser' && effectiveTool !== 'laser') {
-      this.renderLive();
+    if (effectiveTool === 'eraser' || effectiveTool === 'laser') {
+      return;
     }
+
+    // Artımlı (Incremental) O(1) Canlı Kalem Çizimi: tüm sayfayı silmeden sadece yeni eklenen segmenti çiz
+    if (
+      (effectiveTool === 'fountain' || effectiveTool === 'ballpoint' || effectiveTool === 'pencil') &&
+      !this.snappedShapePreview &&
+      !this.selection &&
+      this.laserTrails.length === 0 &&
+      this.currentPoints.length > this.lastLivePointIndex
+    ) {
+      this.drawStrokeIncremental(
+        this.liveCtx,
+        {
+          tool: effectiveTool,
+          color: this.color,
+          size: this.strokeSize,
+          opacity: this.opacity,
+          points: this.currentPoints
+        },
+        Math.max(1, this.lastLivePointIndex)
+      );
+      this.lastLivePointIndex = this.currentPoints.length;
+      return;
+    }
+
+    this.renderLive();
   }
 
   handlePointerUp(e) {
@@ -759,6 +825,8 @@ export class CanvasEngine {
     this.isDrawing = false;
     this.activePointerId = null;
     this.tempBarrelEraser = false;
+    this.activeCanvasRect = null;
+    this.lastLivePointIndex = 0;
 
     if (effectiveTool === 'eraser') {
       this.renderLive();
@@ -783,8 +851,8 @@ export class CanvasEngine {
         const first = this.currentPoints[0];
         const last = this.currentPoints[this.currentPoints.length - 1];
         if (Math.hypot(last.x - first.x, last.y - first.y) > 6) {
-          this.pushUndoSnapshot();
-          this.page.shapes.push({
+          this.pushUndoSnapshot(true);
+          const newShape = {
             id: `sh-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             shapeType: this.shapeType,
             x1: first.x,
@@ -794,7 +862,8 @@ export class CanvasEngine {
             color: this.color,
             size: this.strokeSize,
             fill: this.shapeFill ? this.hexToRgba(this.color, 0.14) : 'transparent'
-          });
+          };
+          this.page.shapes.push(newShape);
           this.renderMain();
           this.onChange();
         }
@@ -805,7 +874,7 @@ export class CanvasEngine {
     }
 
     if (this.snappedShapePreview) {
-      this.pushUndoSnapshot();
+      this.pushUndoSnapshot(true);
       this.page.shapes.push(this.snappedShapePreview);
       this.snappedShapePreview = null;
       this.currentPoints = [];
@@ -816,12 +885,12 @@ export class CanvasEngine {
     }
 
     if (this.currentPoints.length >= 1) {
-      this.pushUndoSnapshot();
+      this.pushUndoSnapshot(true);
       const lastPt = this.currentPoints[this.currentPoints.length - 1];
       if (lastPt) {
         this.lastActiveLineY = this.snapYToLine(lastPt.y);
       }
-      this.page.strokes.push({
+      const newStroke = {
         id: `st-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         tool: effectiveTool,
         color: this.color,
@@ -832,9 +901,13 @@ export class CanvasEngine {
           y: Number(p.y.toFixed(1)),
           p: Number(p.p.toFixed(3))
         }))
-      });
-      this.renderMain();
-      this.renderDOMOverlays();
+      };
+      this.page.strokes.push(newStroke);
+      if (effectiveTool === 'highlighter') {
+        this.renderMain();
+      } else {
+        this.drawStroke(this.mainCtx, newStroke);
+      }
       this.onChange();
     }
 
@@ -846,6 +919,8 @@ export class CanvasEngine {
     clearTimeout(this.holdTimer);
     this.isDrawing = false;
     this.activePointerId = null;
+    this.activeCanvasRect = null;
+    this.lastLivePointIndex = 0;
     this.currentPoints = [];
     this.lassoPolygon = [];
     this.snappedShapePreview = null;
@@ -855,9 +930,13 @@ export class CanvasEngine {
   computePressure(e, velocityInfo) {
     if (!this.pressureEnabled) return 0.55;
 
+    const now = performance.now();
     if (e.pointerType === 'pen' && typeof e.pressure === 'number' && e.pressure > 0) {
       const clamped = Math.max(0.12, Math.min(1.0, e.pressure));
-      this.onStatusUpdate({ pressure: Math.round(clamped * 100) });
+      if (now - this.lastPressureHudTime > 140) {
+        this.lastPressureHudTime = now;
+        this.onStatusUpdate({ pressure: Math.round(clamped * 100) });
+      }
       return clamped;
     }
 
@@ -870,7 +949,10 @@ export class CanvasEngine {
       const speed = dist / dt;
       const targetP = Math.max(0.22, Math.min(0.88, 0.78 - speed * 0.22));
       const smoothed = velocityInfo.prev.p * 0.65 + targetP * 0.35;
-      this.onStatusUpdate({ pressure: Math.round(smoothed * 100) });
+      if (now - this.lastPressureHudTime > 140) {
+        this.lastPressureHudTime = now;
+        this.onStatusUpdate({ pressure: Math.round(smoothed * 100) });
+      }
       return smoothed;
     }
 
@@ -1211,7 +1293,9 @@ export class CanvasEngine {
 
     this.renderMain();
     this.renderLive();
-    this.renderDOMOverlays();
+    if (textIds.size > 0 || imageIds.size > 0 || (audioIds && audioIds.size > 0)) {
+      this.renderDOMOverlays();
+    }
     this.updateSelectionToolbarPosition();
   }
 
@@ -1399,14 +1483,20 @@ export class CanvasEngine {
     ctx.clearRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
 
     const bgImg = this.bgImageCache.get(this.page.id) || null;
-    renderPaperBackground(
-      ctx,
-      PAGE_WIDTH,
-      PAGE_HEIGHT,
-      this.page.template || 'ruled',
-      this.page.paperColor || 'ivory',
-      bgImg
-    );
+    const tpl = this.page.template || 'ruled';
+    const pColor = this.page.paperColor || 'ivory';
+    const cacheKey = `${this.page.id}_${tpl}_${pColor}_${bgImg ? 'img' : 'noimg'}`;
+
+    if (this.paperBgCanvas && this.paperBgCtx) {
+      if (this.paperBgCacheKey !== cacheKey) {
+        this.paperBgCtx.clearRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+        renderPaperBackground(this.paperBgCtx, PAGE_WIDTH, PAGE_HEIGHT, tpl, pColor, bgImg);
+        this.paperBgCacheKey = cacheKey;
+      }
+      ctx.drawImage(this.paperBgCanvas, 0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+    } else {
+      renderPaperBackground(ctx, PAGE_WIDTH, PAGE_HEIGHT, tpl, pColor, bgImg);
+    }
 
     for (const stroke of this.page.strokes) {
       if (stroke.tool === 'highlighter') {
@@ -1560,6 +1650,53 @@ export class CanvasEngine {
       }
     };
     this.laserAnimFrame = requestAnimationFrame(step);
+  }
+
+  drawStrokeIncremental(ctx, stroke, startIdx) {
+    const pts = stroke.points;
+    if (!pts || pts.length <= startIdx) return;
+
+    ctx.save();
+    ctx.globalAlpha = stroke.opacity ?? 1;
+    ctx.fillStyle = stroke.color;
+    ctx.strokeStyle = stroke.color;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    for (let i = Math.max(1, startIdx); i < pts.length; i++) {
+      const p0 = pts[i - 1];
+      const p1 = pts[i];
+
+      if (stroke.tool === 'pencil') {
+        const pressure = ((p0.p || 0.5) + (p1.p || 0.5)) / 2;
+        ctx.globalAlpha = Math.min(0.88, 0.32 + pressure * 0.55);
+        ctx.lineWidth = stroke.size * (0.65 + pressure * 0.55);
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.stroke();
+        continue;
+      }
+
+      const mx = (p0.x + p1.x) / 2;
+      const my = (p0.y + p1.y) / 2;
+      const prevMidX = i > 1 ? (pts[i - 2].x + p0.x) / 2 : p0.x;
+      const prevMidY = i > 1 ? (pts[i - 2].y + p0.y) / 2 : p0.y;
+
+      if (stroke.tool === 'ballpoint') {
+        ctx.lineWidth = stroke.size;
+      } else {
+        const pressure = ((p0.p || 0.5) + (p1.p || 0.5)) / 2;
+        ctx.lineWidth = Math.max(0.9, stroke.size * (0.32 + pressure * 1.15));
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(prevMidX, prevMidY);
+      ctx.quadraticCurveTo(p0.x, p0.y, mx, my);
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   drawStroke(ctx, stroke) {

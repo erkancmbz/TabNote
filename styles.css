@@ -569,16 +569,18 @@ button {
 
 .save-status-badge {
   font-size: 11px;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 99px;
-  background: rgba(16, 185, 129, 0.12);
-  color: #34D399;
+  background: #374151;
+  border: 1px solid #4B5563;
+  color: #E5E7EB;
   font-weight: 600;
+  transition: opacity 0.25s ease;
 }
 
-.save-status-badge.saving {
-  background: rgba(245, 158, 11, 0.15);
-  color: #FBBF24;
+.save-status-badge.fade-out {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .stylus-badge {
@@ -683,7 +685,7 @@ button {
 .palm-reject-btn,
 .toolbar-chip-btn {
   height: 34px;
-  padding: 0 10px;
+  padding: 0 11px;
   border-radius: 8px;
   border: 1px solid var(--border-hairline);
   background: var(--bg-desk);
@@ -695,20 +697,28 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  transition: all 0.15s ease;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
-.palm-reject-btn:hover,
 .toolbar-chip-btn:hover {
   border-color: var(--border-strong);
   color: var(--text-primary);
   background: var(--bg-chrome-elevated);
 }
 
+/* Parmakla Kaydır: Normalken Gri, Üstüne Bastığımızda (Aktifken) Siyah */
+.palm-reject-btn {
+  background: #4B5563;
+  border: 1.5px solid #6B7280;
+  color: #E5E7EB;
+  box-shadow: none;
+}
+
 .palm-reject-btn.active {
-  background: rgba(16, 185, 129, 0.16);
-  border-color: #10B981;
-  color: #34D399;
+  background: #0B0E14;
+  border: 1.5px solid #1F2937;
+  color: #FFFFFF;
+  box-shadow: none;
 }
 
 .toolbar-chip-btn.primary-chip {
@@ -1687,7 +1697,7 @@ button {
   }
 }
 
-/* KALEM AKTİF / AKTİF DEĞİL BUTONU VE YENİ BİLEŞENLER */
+/* KALEM AKTİF BUTONU: Aktifken Siyah, Tıkladığımızda (Pasifken) Gri — Işıldama Yok */
 .pen-state-btn {
   height: 36px;
   padding: 0 13px;
@@ -1697,36 +1707,38 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 1.5px solid var(--border-strong);
-  transition: all 0.16s ease;
+  border: 1.5px solid #1F2937;
+  box-shadow: none;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 
 .pen-state-btn .pen-state-dot {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
+  box-shadow: none;
 }
 
 .pen-state-btn.is-active {
-  background: rgba(16, 185, 129, 0.16);
-  border-color: #10B981;
-  color: #34D399;
+  background: #0B0E14;
+  border-color: #1F2937;
+  color: #FFFFFF;
 }
 
 .pen-state-btn.is-active .pen-state-dot {
-  background: #10B981;
-  box-shadow: 0 0 8px #10B981;
+  background: #FFFFFF;
+  box-shadow: none;
 }
 
 .pen-state-btn.is-inactive {
-  background: rgba(245, 158, 11, 0.15);
-  border-color: #F59E0B;
-  color: #FBBF24;
+  background: #4B5563;
+  border-color: #6B7280;
+  color: #E5E7EB;
 }
 
 .pen-state-btn.is-inactive .pen-state-dot {
-  background: #F59E0B;
-  box-shadow: 0 0 8px #F59E0B;
+  background: #9CA3AF;
+  box-shadow: none;
 }
 
 .toolbar-chip-btn.accent-chip {
