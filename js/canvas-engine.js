@@ -146,6 +146,7 @@ export class CanvasEngine {
   }
 
   loadPage(pageObj) {
+    if (!pageObj) return;
     this.clearSelection();
     this.page = pageObj;
     if (!this.page.strokes) this.page.strokes = [];
@@ -161,12 +162,16 @@ export class CanvasEngine {
     }
 
     if (pageObj.bgImageData) {
-      const img = new Image();
-      img.onload = () => {
-        this.bgImageCache.set(pageObj.id, img);
-        this.renderMain();
-      };
-      img.src = pageObj.bgImageData;
+      if (!this.bgImageCache.has(pageObj.id)) {
+        const img = new Image();
+        img.onload = () => {
+          this.bgImageCache.set(pageObj.id, img);
+          if (this.page?.id === pageObj.id) {
+            this.renderMain();
+          }
+        };
+        img.src = pageObj.bgImageData;
+      }
     } else {
       this.bgImageCache.delete(pageObj.id);
     }
@@ -178,11 +183,12 @@ export class CanvasEngine {
 
   setPageBackgroundImage(dataUrl) {
     if (!this.page) return;
+    const targetPage = this.page;
     this.pushUndoSnapshot();
-    this.page.bgImageData = dataUrl;
+    targetPage.bgImageData = dataUrl;
     const img = new Image();
     img.onload = () => {
-      this.bgImageCache.set(pageObj.id, img);
+      this.bgImageCache.set(targetPage.id, img);
       this.renderMain();
       this.onChange();
     };

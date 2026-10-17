@@ -97,6 +97,7 @@ class TabNoteApp {
   }
 
   initCanvasEngine() {
+    this.paperSheetEl = document.querySelector('.paper-sheet-container');
     this.engine = new CanvasEngine({
       viewportEl: document.getElementById('canvasViewport'),
       pageWrapperEl: document.getElementById('pageScaleWrapper'),
@@ -105,6 +106,9 @@ class TabNoteApp {
       overlayLayer: document.getElementById('domOverlayLayer'),
       selectionToolbarEl: document.getElementById('lassoActionBar'),
       onChange: () => {
+        if (this.activeNotebook) {
+          this.syncPagePreviewSlot(this.activeNotebook.activePageIndex || 0);
+        }
         this.scheduleAutoSave();
         this.updateUndoRedoButtons();
       },
@@ -121,6 +125,46 @@ class TabNoteApp {
         }
       }
     });
+
+    // Sonsuz Dikey Sayfa Kaydırma: Kullanıcı aşağı/yukarı kaydırdıkça görünürdeki sayfayı aktif et
+    const viewportEl = document.getElementById('canvasViewport');
+    viewportEl?.addEventListener(
+      'scroll',
+      () => {
+        if (!this.activeNotebook || this.engine?.isDrawing || this.isProgrammaticScroll) return;
+        const container = document.getElementById('continuousPagesContainer');
+        if (!container) return;
+        const slots = container.querySelectorAll('.continuous-page-slot');
+        if (slots.length <= 1) return;
+
+        const vpRect = viewportEl.getBoundingClientRect();
+        const vpCenterY = vpRect.top + vpRect.height * 0.45;
+
+        let bestIdx = this.activeNotebook.activePageIndex || 0;
+        let bestDist = Infinity;
+
+        slots.forEach((slot) => {
+          const rect = slot.getBoundingClientRect();
+          const idx = Number(slot.dataset.pageIndex);
+          if (vpCenterY >= rect.top && vpCenterY <= rect.bottom) {
+            bestIdx = idx;
+            bestDist = 0;
+          } else if (bestDist > 0) {
+            const center = (rect.top + rect.bottom) / 2;
+            const d = Math.abs(center - vpCenterY);
+            if (d < bestDist) {
+              bestDist = d;
+              bestIdx = idx;
+            }
+          }
+        });
+
+        if (bestIdx !== this.activeNotebook.activePageIndex) {
+          this.activatePageSlot(bestIdx, false);
+        }
+      },
+      { passive: true }
+    );
   }
 
   updatePenActiveUI() {
@@ -149,7 +193,7 @@ class TabNoteApp {
     }
   }
 
-  loadActiveNotebookIntoWorkspace() {
+  loadActiveNotebookIntoWorkspace(scrollToActive = false) {
     if (!this.activeNotebook) return;
 
     const titleInput = document.getElementById('notebookTitleInput');
@@ -165,13 +209,172 @@ class TabNoteApp {
     );
     this.activeNotebook.activePageIndex = idx;
 
-    const currentPage = this.activeNotebook.pages[idx];
-    this.engine.loadPage(currentPage);
+    this.renderContinuousPagesStack(scrollToActive);
 
     this.updatePageCounterUI();
     this.updateUndoRedoButtons();
     if (this.sidebarTab === 'pages') {
       this.renderPageThumbnails();
+    }
+  }
+
+  renderPageOntoPreviewCanvas(pg, canvas) {
+    if (!pg || !canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+
+    const drawContents = (bgImg) => {
+      renderPaperBackground(
+        ctx,
+        PAGE_WIDTH,
+        PAGE_HEIGHT,
+        pg.template || 'ruled',
+        pg.paperColor || 'ivory',
+        bgImg
+      );
+      if (this.engine) {
+        for (const st of pg.strokes || []) {
+          this.engine.drawStroke(ctx, st);
+        }
+        for (const sh of pg.shapes || []) {
+          this.engine.drawGeometricShape(ctx, sh);
+        }
+      }
+    };
+
+    if (pg.bgImageData) {
+      const cached = this.engine?.bgImageCache?.get(pg.id);
+      if (cached) {
+        drawContents(cached);
+      } else {
+        drawContents(null);
+        const img = new Image();
+        img.onload = () => {
+          this.engine?.bgImageCache?.set(pg.id, img);
+          drawContents(img);
+        };
+        img.src = pg.bgImageData;
+      }
+    } else {
+      drawContents(null);
+    }
+  }
+
+  syncPagePreviewSlot(pageIndex) {
+    if (!this.activeNotebook) return;
+    const pg = this.activeNotebook.pages[pageIndex];
+    const container = document.getElementById('continuousPagesContainer');
+    if (!pg || !container) return;
+    const slot = container.querySelector(`.continuous-page-slot[data-page-index="${pageIndex}"]`);
+    const previewCanvas = slot?.querySelector('.page-slot-preview');
+    if (previewCanvas) {
+      this.renderPageOntoPreviewCanvas(pg, previewCanvas);
+    }
+  }
+
+  renderContinuousPagesStack(scrollToActive = false) {
+    const container = document.getElementById('continuousPagesContainer');
+    if (!container || !this.activeNotebook) return;
+
+    if (this.paperSheetEl && this.paperSheetEl.parentNode) {
+      this.paperSheetEl.parentNode.removeChild(this.paperSheetEl);
+    }
+    container.innerHTML = '';
+
+    const activeIdx = this.activeNotebook.activePageIndex || 0;
+    const total = this.activeNotebook.pages.length;
+
+    this.activeNotebook.pages.forEach((pg, index) => {
+      const slot = document.createElement('div');
+      slot.className = `continuous-page-slot ${index === activeIdx ? 'active-slot' : ''}`;
+      slot.dataset.pageIndex = String(index);
+
+      const badge = document.createElement('span');
+      badge.className = 'page-slot-badge';
+      badge.textContent = `Sayfa ${index + 1} / ${total}`;
+
+      const previewCanvas = document.createElement('canvas');
+      previewCanvas.className = 'page-slot-preview';
+      previewCanvas.width = PAGE_WIDTH;
+      previewCanvas.height = PAGE_HEIGHT;
+      this.renderPageOntoPreviewCanvas(pg, previewCanvas);
+
+      slot.append(badge, previewCanvas);
+
+      slot.addEventListener('pointerdown', () => {
+        if (this.activeNotebook && this.activeNotebook.activePageIndex !== index) {
+          this.activatePageSlot(index, false);
+        }
+      });
+
+      if (index === activeIdx && this.paperSheetEl) {
+        slot.appendChild(this.paperSheetEl);
+      }
+
+      container.appendChild(slot);
+    });
+
+    const currentPage = this.activeNotebook.pages[activeIdx];
+    if (currentPage) {
+      this.engine.loadPage(currentPage);
+    }
+
+    if (scrollToActive) {
+      const activeSlot = container.querySelector(
+        `.continuous-page-slot[data-page-index="${activeIdx}"]`
+      );
+      if (activeSlot) {
+        this.isProgrammaticScroll = true;
+        activeSlot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => {
+          this.isProgrammaticScroll = false;
+        }, 450);
+      }
+    }
+  }
+
+  activatePageSlot(newIndex, scrollIntoView = false) {
+    if (!this.activeNotebook) return;
+    if (newIndex < 0 || newIndex >= this.activeNotebook.pages.length) return;
+
+    const oldIndex = this.activeNotebook.activePageIndex || 0;
+    if (oldIndex !== newIndex) {
+      this.syncPagePreviewSlot(oldIndex);
+    }
+
+    this.activeNotebook.activePageIndex = newIndex;
+    const container = document.getElementById('continuousPagesContainer');
+    if (container) {
+      const slots = container.querySelectorAll('.continuous-page-slot');
+      slots.forEach((slot) => {
+        const idx = Number(slot.dataset.pageIndex);
+        slot.classList.toggle('active-slot', idx === newIndex);
+        if (idx === newIndex && this.paperSheetEl && slot !== this.paperSheetEl.parentNode) {
+          slot.appendChild(this.paperSheetEl);
+        }
+      });
+
+      if (scrollIntoView) {
+        const targetSlot = container.querySelector(
+          `.continuous-page-slot[data-page-index="${newIndex}"]`
+        );
+        if (targetSlot) {
+          this.isProgrammaticScroll = true;
+          targetSlot.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          setTimeout(() => {
+            this.isProgrammaticScroll = false;
+          }, 450);
+        }
+      }
+    }
+
+    this.engine.loadPage(this.activeNotebook.pages[newIndex]);
+    this.updatePageCounterUI();
+    this.updateUndoRedoButtons();
+    if (this.sidebarTab === 'pages') {
+      document.querySelectorAll('#pageThumbnailsGrid .page-thumb-card').forEach((card, i) => {
+        card.classList.toggle('active', i === newIndex);
+      });
     }
   }
 
@@ -251,7 +454,7 @@ class TabNoteApp {
     });
 
     document.getElementById('homeNewNotebookBtn')?.addEventListener('click', () => {
-      this.createNewNotebook(true);
+      this.openCreateNotebookModal();
     });
 
     document.getElementById('homeSearchInput')?.addEventListener('input', (e) => {
@@ -285,7 +488,15 @@ class TabNoteApp {
     });
 
     document.getElementById('newNotebookBtn').addEventListener('click', () => {
-      this.createNewNotebook(true);
+      this.openCreateNotebookModal();
+    });
+
+    document.getElementById('closeCreateNbModalBtn')?.addEventListener('click', () => {
+      document.getElementById('createNotebookModal')?.classList.add('hidden');
+    });
+
+    document.getElementById('cancelCreateNbBtn')?.addEventListener('click', () => {
+      document.getElementById('createNotebookModal')?.classList.add('hidden');
     });
 
     document.getElementById('newFolderBtn').addEventListener('click', () => {
@@ -388,8 +599,7 @@ class TabNoteApp {
     // Sayfalar Arası Geçiş & Yeni Sayfa
     document.getElementById('prevPageBtn').addEventListener('click', () => {
       if (!this.activeNotebook || this.activeNotebook.activePageIndex <= 0) return;
-      this.activeNotebook.activePageIndex--;
-      this.loadActiveNotebookIntoWorkspace();
+      this.activatePageSlot(this.activeNotebook.activePageIndex - 1, true);
       this.scheduleAutoSave();
     });
 
@@ -399,8 +609,7 @@ class TabNoteApp {
         this.activeNotebook.activePageIndex >= this.activeNotebook.pages.length - 1
       )
         return;
-      this.activeNotebook.activePageIndex++;
-      this.loadActiveNotebookIntoWorkspace();
+      this.activatePageSlot(this.activeNotebook.activePageIndex + 1, true);
       this.scheduleAutoSave();
     });
 
@@ -409,6 +618,9 @@ class TabNoteApp {
     });
     document.getElementById('sidebarAddPageBtn').addEventListener('click', () => {
       this.addNewPageToCurrentNotebook();
+    });
+    document.getElementById('continuousAddPageTrigger')?.addEventListener('click', () => {
+      this.addNewPageToCurrentNotebook(true);
     });
 
     // Yakınlaştırma (Zoom) Kontrolleri
@@ -1319,7 +1531,7 @@ class TabNoteApp {
       <span>${this.escapeHtml(activeFldObj?.name || 'Bu klasöre')} yeni defter aç</span>
     `;
     createCard.addEventListener('click', () => {
-      this.createNewNotebook(true);
+      this.openCreateNotebookModal();
     });
     gridEl.appendChild(createCard);
 
@@ -1393,7 +1605,7 @@ class TabNoteApp {
       infoBody.innerHTML = `
         <div class="home-nb-title-row">
           <h4 class="home-nb-title">${this.escapeHtml(nb.title || 'Adsız Not Defteri')}</h4>
-          <button type="button" class="home-nb-del-btn" title="Not Defterini Sil">🗑</button>
+          <button type="button" class="home-nb-del-btn" title="Not Defterini Sil">🗑 Sil</button>
         </div>
         <div class="home-nb-meta-row">
           <span class="home-nb-folder-chip" style="border-color:${folderObj?.color || '#3B82F6'}55">
@@ -1406,18 +1618,14 @@ class TabNoteApp {
 
       infoBody.querySelector('.home-nb-del-btn').addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (this.notebooks.length <= 1) {
-          this.showToast('En az bir not defteri kalmalıdır.');
-          return;
-        }
         await storage.deleteNotebook(nb.id);
         this.notebooks = await storage.getAllNotebooks();
         if (this.activeNotebook?.id === nb.id) {
-          this.activeNotebook = this.notebooks[0];
+          this.activeNotebook = this.notebooks[0] || null;
         }
         this.renderHomeScreen();
         this.renderSidebar();
-        this.showToast('Not defteri silindi.');
+        this.showToast(`"${nb.title || 'Not defteri'}" silindi.`);
       });
 
       card.append(previewWrap, infoBody);
@@ -1486,7 +1694,7 @@ class TabNoteApp {
         </div>
       `;
       document.getElementById('emptyCreateNbBtn')?.addEventListener('click', () => {
-        this.createNewNotebook(true);
+        this.openCreateNotebookModal();
       });
       return;
     }
@@ -1529,19 +1737,19 @@ class TabNoteApp {
 
       card.querySelector('.nb-card-del-btn').addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (this.notebooks.length <= 1) {
-          this.showToast('En az bir not defteri kalmalıdır.');
-          return;
-        }
         await storage.deleteNotebook(nb.id);
         this.notebooks = await storage.getAllNotebooks();
         if (this.activeNotebook?.id === nb.id) {
-          this.activeNotebook = this.notebooks[0];
-          this.loadActiveNotebookIntoWorkspace();
+          this.activeNotebook = this.notebooks[0] || null;
+          if (this.activeNotebook) {
+            this.loadActiveNotebookIntoWorkspace();
+          } else {
+            this.showHomeScreen();
+          }
         }
         this.renderSidebar();
         this.renderHomeScreen();
-        this.showToast('Not defteri silindi.');
+        this.showToast(`"${nb.title || 'Not defteri'}" silindi.`);
       });
 
       listEl.appendChild(card);
@@ -1595,8 +1803,7 @@ class TabNoteApp {
 
       card.addEventListener('click', (e) => {
         if (e.target.closest('.thumb-act-btn')) return;
-        this.activeNotebook.activePageIndex = index;
-        this.loadActiveNotebookIntoWorkspace();
+        this.activatePageSlot(index, true);
       });
 
       footer.querySelector('.dup').addEventListener('click', (e) => {
@@ -1605,7 +1812,7 @@ class TabNoteApp {
         cloned.id = `pg-${Date.now()}`;
         this.activeNotebook.pages.splice(index + 1, 0, cloned);
         this.activeNotebook.activePageIndex = index + 1;
-        this.loadActiveNotebookIntoWorkspace();
+        this.loadActiveNotebookIntoWorkspace(true);
         this.scheduleAutoSave();
         this.showToast(`Sayfa ${index + 1} çoğaltıldı.`);
       });
@@ -1631,27 +1838,167 @@ class TabNoteApp {
     });
   }
 
-  async createNewNotebook(openInEditor = true) {
+  openCreateNotebookModal() {
+    const modal = document.getElementById('createNotebookModal');
+    const titleInput = document.getElementById('newNbTitleInput');
+    const folderChipsEl = document.getElementById('newNbFolderChips');
+    const coverSwatchesEl = document.getElementById('newNbCoverColorSwatches');
+    const paperColorsEl = document.getElementById('newNbPaperColorsGrid');
+    const templatesEl = document.getElementById('newNbTemplatesGrid');
+    const confirmBtn = document.getElementById('confirmCreateNbBtn');
+    if (!modal) return;
+
+    const coverColors = [
+      '#2563EB',
+      '#059669',
+      '#8B5CF6',
+      '#EC4899',
+      '#D97706',
+      '#DC2626',
+      '#0891B2',
+      '#4F46E5'
+    ];
+
+    const customFolders = this.folders.filter((f) => !f.system);
+    const defaultFolderId =
+      this.activeFolderId !== 'all' && this.activeFolderId !== 'favorites'
+        ? this.activeFolderId
+        : customFolders[0]?.id || 'study';
+
+    const draft = {
+      title: `Yeni Not Defteri ${this.notebooks.length + 1}`,
+      folderId: defaultFolderId,
+      coverColor: coverColors[this.notebooks.length % coverColors.length],
+      paperColor: 'ivory',
+      template: 'ruled'
+    };
+
+    if (titleInput) {
+      titleInput.value = draft.title;
+    }
+
+    const renderDraftChoices = () => {
+      // 1. Klasör çipleri
+      if (folderChipsEl) {
+        folderChipsEl.innerHTML = '';
+        for (const fld of customFolders) {
+          const chip = document.createElement('button');
+          chip.type = 'button';
+          chip.className = `create-nb-folder-chip ${draft.folderId === fld.id ? 'active' : ''}`;
+          chip.innerHTML = `<span class="folder-dot" style="background:${fld.color}"></span><span>${this.escapeHtml(fld.name)}</span>`;
+          chip.addEventListener('click', () => {
+            draft.folderId = fld.id;
+            renderDraftChoices();
+          });
+          folderChipsEl.appendChild(chip);
+        }
+      }
+
+      // 2. Kapak renkleri
+      if (coverSwatchesEl) {
+        coverSwatchesEl.innerHTML = '';
+        for (const hex of coverColors) {
+          const sw = document.createElement('button');
+          sw.type = 'button';
+          sw.className = `create-nb-cover-swatch ${draft.coverColor === hex ? 'active' : ''}`;
+          sw.style.background = hex;
+          sw.title = `Kapak Rengi: ${hex}`;
+          sw.addEventListener('click', () => {
+            draft.coverColor = hex;
+            renderDraftChoices();
+          });
+          coverSwatchesEl.appendChild(sw);
+        }
+      }
+
+      // 3. Sayfa kağıt renkleri
+      if (paperColorsEl) {
+        paperColorsEl.innerHTML = '';
+        for (const c of PAPER_COLORS) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `paper-color-choice ${draft.paperColor === c.id ? 'active' : ''}`;
+          btn.innerHTML = `
+            <span class="paper-color-preview" style="background:${c.bg}; border-color:${c.line}"></span>
+            <span class="paper-color-name">${c.name}</span>
+          `;
+          btn.addEventListener('click', () => {
+            draft.paperColor = c.id;
+            renderDraftChoices();
+          });
+          paperColorsEl.appendChild(btn);
+        }
+      }
+
+      // 4. Kağıt şablonları (Çizgili, Kareli, İzometrik, Noktalı, Düz Boş vb.)
+      if (templatesEl) {
+        templatesEl.innerHTML = '';
+        for (const tpl of PAPER_TEMPLATES) {
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = `template-choice-card ${draft.template === tpl.id ? 'active' : ''}`;
+
+          const miniCanvas = document.createElement('canvas');
+          miniCanvas.width = 150;
+          miniCanvas.height = 190;
+          const mCtx = miniCanvas.getContext('2d');
+          mCtx.scale(0.32, 0.32);
+          renderPaperBackground(mCtx, 470, 600, tpl.id, draft.paperColor);
+
+          const info = document.createElement('div');
+          info.className = 'template-choice-info';
+          info.innerHTML = `
+            <strong>${tpl.name}</strong>
+            <span>${tpl.desc}</span>
+          `;
+
+          card.append(miniCanvas, info);
+          card.addEventListener('click', () => {
+            draft.template = tpl.id;
+            renderDraftChoices();
+          });
+          templatesEl.appendChild(card);
+        }
+      }
+    };
+
+    renderDraftChoices();
+    modal.classList.remove('hidden');
+
+    if (confirmBtn) {
+      confirmBtn.onclick = async () => {
+        draft.title = (titleInput?.value || '').trim() || `Yeni Not Defteri ${this.notebooks.length + 1}`;
+        modal.classList.add('hidden');
+        await this.createNewNotebook(true, draft);
+      };
+    }
+  }
+
+  async createNewNotebook(openInEditor = true, customConfig = null) {
     const targetFolder =
-      this.activeFolderId === 'all' || this.activeFolderId === 'favorites'
+      customConfig?.folderId ||
+      (this.activeFolderId === 'all' || this.activeFolderId === 'favorites'
         ? 'study'
-        : this.activeFolderId;
+        : this.activeFolderId);
 
     const colors = ['#2563EB', '#059669', '#8B5CF6', '#EC4899', '#D97706'];
+    const chosenPaperColor = customConfig?.paperColor || 'ivory';
+    const chosenTemplate = customConfig?.template || 'ruled';
+
     const newNb = {
       id: `nb-${Date.now()}`,
-      title: `Yeni Not Defteri ${this.notebooks.length + 1}`,
+      title: customConfig?.title || `Yeni Not Defteri ${this.notebooks.length + 1}`,
       folderId: targetFolder,
       favorite: this.activeFolderId === 'favorites',
-      coverColor: colors[this.notebooks.length % colors.length],
+      coverColor: customConfig?.coverColor || colors[this.notebooks.length % colors.length],
       createdAt: Date.now(),
       updatedAt: Date.now(),
       activePageIndex: 0,
       pages: [
         {
           id: `pg-${Date.now()}`,
-          template: 'ruled',
-          paperColor: 'ivory',
+          template: chosenTemplate,
+          paperColor: chosenPaperColor,
           bgImageData: null,
           strokes: [],
           shapes: [],
@@ -1663,6 +2010,14 @@ class TabNoteApp {
       ]
     };
 
+    // Koyu kağıt seçildiyse mürekkebi otomatik beyaz yap
+    const colorObj = PAPER_COLORS.find((c) => c.id === chosenPaperColor);
+    if (colorObj?.isDark && this.engine?.color.toLowerCase() === '#0f172a') {
+      this.setInkColor('#F8FAFC');
+    } else if (!colorObj?.isDark && this.engine?.color.toLowerCase() === '#f8fafc') {
+      this.setInkColor('#0F172A');
+    }
+
     await storage.saveNotebook(newNb);
     this.notebooks = await storage.getAllNotebooks();
     this.activeNotebook = newNb;
@@ -1671,13 +2026,14 @@ class TabNoteApp {
     if (openInEditor) {
       this.openNotebookInEditor(newNb);
     }
-    this.showToast('Yeni not defteri açıldı.');
+    this.showToast(`"${newNb.title}" oluşturuldu ve açıldı.`);
   }
 
-  addNewPageToCurrentNotebook() {
+  addNewPageToCurrentNotebook(appendToBottom = false) {
     if (!this.activeNotebook) return;
     const currentPg =
       this.activeNotebook.pages[this.activeNotebook.activePageIndex] ||
+      this.activeNotebook.pages[this.activeNotebook.pages.length - 1] ||
       this.activeNotebook.pages[0];
 
     const newPage = {
@@ -1693,10 +2049,12 @@ class TabNoteApp {
       audioNotes: []
     };
 
-    const insertIdx = (this.activeNotebook.activePageIndex || 0) + 1;
+    const insertIdx = appendToBottom
+      ? this.activeNotebook.pages.length
+      : (this.activeNotebook.activePageIndex || 0) + 1;
     this.activeNotebook.pages.splice(insertIdx, 0, newPage);
     this.activeNotebook.activePageIndex = insertIdx;
-    this.loadActiveNotebookIntoWorkspace();
+    this.loadActiveNotebookIntoWorkspace(true);
     this.scheduleAutoSave();
     this.showToast(`Sayfa ${insertIdx + 1} eklendi.`);
   }
@@ -1727,6 +2085,9 @@ class TabNoteApp {
             this.setInkColor('#0F172A');
           }
           this.engine.renderMain();
+          if (this.activeNotebook) {
+            this.syncPagePreviewSlot(this.activeNotebook.activePageIndex || 0);
+          }
           this.scheduleAutoSave();
           renderModalChoices();
         });
@@ -1757,6 +2118,9 @@ class TabNoteApp {
         card.addEventListener('click', () => {
           currentPage.template = tpl.id;
           this.engine.renderMain();
+          if (this.activeNotebook) {
+            this.syncPagePreviewSlot(this.activeNotebook.activePageIndex || 0);
+          }
           this.scheduleAutoSave();
           renderModalChoices();
         });

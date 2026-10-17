@@ -41,9 +41,13 @@ const combinedBundle = `/* TabNote Studio Android Bundle */\n(function(){\n${tem
 
 fs.writeFileSync(path.join(assetsDir, 'bundle.js'), combinedBundle, 'utf8');
 
-// 2. CSS ve HTML'i assets içine kopyala (type="module" yerine bundle.js kullanacak şekilde)
+// 2. CSS, Logo ve HTML'i assets içine kopyala (type="module" yerine bundle.js kullanacak şekilde)
 const cssCode = fs.readFileSync(path.join(__dirname, 'styles.css'), 'utf8');
 fs.writeFileSync(path.join(assetsDir, 'styles.css'), cssCode, 'utf8');
+
+if (fs.existsSync(path.join(__dirname, 'logo.svg'))) {
+  fs.copyFileSync(path.join(__dirname, 'logo.svg'), path.join(assetsDir, 'logo.svg'));
+}
 
 let htmlCode = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 htmlCode = htmlCode.replace(
@@ -52,12 +56,45 @@ htmlCode = htmlCode.replace(
 );
 fs.writeFileSync(path.join(assetsDir, 'index.html'), htmlCode, 'utf8');
 
-// 3. AndroidManifest.xml oluştur (Tam ekran, donanım hızlandırmalı, doğrudan mikrofon kaydı + dosya/fotoğraf/PDF erişimli)
+// 2b. Android Uygulama İkonu (res/drawable/ic_launcher.xml) oluştur
+const icLauncherXml = `<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="128"
+    android:viewportHeight="128">
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M28,8 L100,8 C111,8 120,17 120,28 L120,100 C120,111 111,120 100,120 L28,120 C17,120 8,111 8,100 L8,28 C8,17 17,8 28,8 Z" />
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M26,24 L36,24 L36,104 L26,104 Z" />
+    <path
+        android:fillColor="#FCFBF7"
+        android:pathData="M34,24 L86,24 C91.5,24 96,28.5 96,34 L96,94 C96,99.5 91.5,104 86,104 L34,104 Z" />
+    <path
+        android:strokeColor="#CBD5E1"
+        android:strokeWidth="2.5"
+        android:pathData="M44,42 L84,42 M44,54 L84,54 M44,66 L76,66 M44,78 L68,78" />
+    <path
+        android:strokeColor="#3B82F6"
+        android:strokeWidth="3.5"
+        android:pathData="M44,90 Q54,82 62,90 T78,86" />
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M98,22 L108,32 L76,64 L66,54 Z" />
+    <path
+        android:fillColor="#FDE68A"
+        android:pathData="M66,54 L76,64 L62,68 Z" />
+</vector>`;
+fs.writeFileSync(path.join(resDrawableDir, 'ic_launcher.xml'), icLauncherXml, 'utf8');
+
+// 3. AndroidManifest.xml oluştur (Tam ekran, özel ikonlu, donanım hızlandırmalı, doğrudan mikrofon kaydı + dosya/fotoğraf/PDF erişimli)
 const manifestXml = `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.tabnote.studio"
-    android:versionCode="5"
-    android:versionName="1.4.0">
+    android:versionCode="6"
+    android:versionName="1.5.0">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -67,6 +104,7 @@ const manifestXml = `<?xml version="1.0" encoding="utf-8"?>
 
     <application
         android:label="TabNote Studio"
+        android:icon="@drawable/ic_launcher"
         android:hardwareAccelerated="true"
         android:usesCleartextTraffic="true"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen">

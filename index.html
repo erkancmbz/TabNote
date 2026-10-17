@@ -7,6 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>TabNote Studio — Tablet & Kalem Not Defteri</title>
+  <link rel="icon" type="image/svg+xml" href="./logo.svg" />
   <link rel="manifest" href="./manifest.json" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -22,14 +23,10 @@
     <header class="home-topbar">
       <div class="home-brand">
         <div class="brand-emblem">
-          <svg viewBox="0 0 28 28" fill="none">
-            <rect x="3" y="3" width="22" height="22" rx="6" fill="#2563EB" />
-            <path d="M8 10h12M8 14.5h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
-            <path d="M16.5 21l5.5-9.5 2.5 1.5-5.5 9.5-3 .8.5-2.3z" fill="#FACC15" />
-          </svg>
+          <img src="./logo.svg" alt="TabNote Studio Logo" class="brand-logo-img" />
         </div>
         <div>
-          <h1 class="home-title">TabNote</h1>
+          <h1 class="home-title">TabNote Studio</h1>
           <p class="home-subtitle">Klasörlerim ve Not Defterlerim</p>
         </div>
       </div>
@@ -94,11 +91,7 @@
       <div class="sidebar-brand-header">
         <div class="brand-logo-group">
           <div class="brand-emblem">
-            <svg viewBox="0 0 28 28" fill="none">
-              <rect x="3" y="3" width="22" height="22" rx="6" fill="#2563EB" />
-              <path d="M8 10h12M8 14.5h8" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" />
-              <path d="M16.5 21l5.5-9.5 2.5 1.5-5.5 9.5-3 .8.5-2.3z" fill="#FACC15" />
-            </svg>
+            <img src="./logo.svg" alt="TabNote Studio Logo" class="brand-logo-img" />
           </div>
           <div>
             <h1 class="brand-title">TabNote</h1>
@@ -447,21 +440,29 @@
       <!-- TUVAL ÇALIŞMA MASASI (CANVAS VIEWPORT) -->
       <div id="canvasViewport" class="canvas-viewport">
         <div id="pageScaleWrapper" class="page-scale-wrapper">
-          <div class="paper-sheet-container">
-            <canvas id="mainCanvas" class="paper-canvas main-canvas"></canvas>
-            <canvas id="liveCanvas" class="paper-canvas live-canvas"></canvas>
-            <div id="domOverlayLayer" class="dom-overlay-layer"></div>
+          <div id="continuousPagesContainer" class="continuous-pages-container">
+            <div class="paper-sheet-container">
+              <canvas id="mainCanvas" class="paper-canvas main-canvas"></canvas>
+              <canvas id="liveCanvas" class="paper-canvas live-canvas"></canvas>
+              <div id="domOverlayLayer" class="dom-overlay-layer"></div>
 
-            <!-- Kement (Lasso) Seçimi Yapıldığında Çıkan Yüzen Araç Çubuğu -->
-            <div id="lassoActionBar" class="lasso-action-bar hidden">
-              <span class="lasso-badge">Seçim</span>
-              <label class="lasso-color-btn" title="Seçili Çizimlerin Rengini Değiştir">
-                <span>🎨 Renk</span>
-                <input type="color" id="lassoColorInput" value="#2563EB" />
-              </label>
-              <button type="button" id="lassoDuplicateBtn" title="Seçimi Çoğalt">⧉ Çoğalt</button>
-              <button type="button" id="lassoDeleteBtn" class="danger" title="Seçimi Sil">🗑 Sil</button>
+              <!-- Kement (Lasso) Seçimi Yapıldığında Çıkan Yüzen Araç Çubuğu -->
+              <div id="lassoActionBar" class="lasso-action-bar hidden">
+                <span class="lasso-badge">Seçim</span>
+                <label class="lasso-color-btn" title="Seçili Çizimlerin Rengini Değiştir">
+                  <span>🎨 Renk</span>
+                  <input type="color" id="lassoColorInput" value="#2563EB" />
+                </label>
+                <button type="button" id="lassoDuplicateBtn" title="Seçimi Çoğalt">⧉ Çoğalt</button>
+                <button type="button" id="lassoDeleteBtn" class="danger" title="Seçimi Sil">🗑 Sil</button>
+              </div>
             </div>
+          </div>
+
+          <div class="continuous-bottom-add-wrap">
+            <button type="button" id="continuousAddPageTrigger" class="continuous-add-page-btn">
+              <span>＋ Yeni Sayfa Ekle (Aşağıya Devam Et)</span>
+            </button>
           </div>
         </div>
       </div>
@@ -660,6 +661,45 @@
         <div class="modal-actions">
           <button type="button" id="promptModalCancelBtn" class="btn-secondary-sm">İptal</button>
           <button type="button" id="promptModalConfirmBtn" class="btn-primary-sm">Oluştur</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: YENİ NOT DEFTERİ OLUŞTURMA (TÜM DETAYLARLA) -->
+  <div id="createNotebookModal" class="modal-backdrop hidden">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div>
+          <h3>📒 Yeni Not Defteri Oluştur</h3>
+          <p class="modal-sub">Not defterinizin adını, klasörünü, kapak rengini, sayfa rengini ve kağıt çizgisi/şeklini seçin.</p>
+        </div>
+        <button type="button" id="closeCreateNbModalBtn" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body create-nb-modal-body">
+        <div class="create-nb-row-two">
+          <div class="create-nb-field">
+            <label for="newNbTitleInput" class="modal-section-label">Not Defteri Adı</label>
+            <input type="text" id="newNbTitleInput" class="modal-text-input" placeholder="Örn: Matematik Ders Notları, Proje Çizimleri..." />
+          </div>
+          <div class="create-nb-field">
+            <label class="modal-section-label">Klasör Seçimi</label>
+            <div id="newNbFolderChips" class="create-nb-folder-chips"></div>
+          </div>
+        </div>
+
+        <h4 class="modal-section-label">Defter Kapak Rengi</h4>
+        <div id="newNbCoverColorSwatches" class="create-nb-cover-swatches"></div>
+
+        <h4 class="modal-section-label">Sayfa Kağıt Rengi</h4>
+        <div id="newNbPaperColorsGrid" class="paper-colors-grid"></div>
+
+        <h4 class="modal-section-label">Sayfa Şekli & Kağıt Şablonu (Çizgili, Kareli, İzometrik, Noktalı, Boş...)</h4>
+        <div id="newNbTemplatesGrid" class="paper-templates-grid"></div>
+
+        <div class="modal-actions create-nb-footer-actions">
+          <button type="button" id="cancelCreateNbBtn" class="btn-secondary-sm">İptal</button>
+          <button type="button" id="confirmCreateNbBtn" class="btn-primary-sm create-nb-submit-btn">✨ Not Defterini Oluştur ve Aç</button>
         </div>
       </div>
     </div>

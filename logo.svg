@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="16" y1="16" x2="240" y2="240" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1E3A8A" />
+      <stop offset="52%" stop-color="#2563EB" />
+      <stop offset="100%" stop-color="#0F172A" />
+    </linearGradient>
+    <linearGradient id="paperGrad" x1="56" y1="44" x2="188" y2="212" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#F1F5F9" />
+    </linearGradient>
+    <linearGradient id="penGrad" x1="136" y1="60" x2="216" y2="196" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FDE047" />
+      <stop offset="50%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#D97706" />
+    </linearGradient>
+    <filter id="cardShadow" x="32" y="28" width="192" height="208" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#020617" flood-opacity="0.45" />
+    </filter>
+  </defs>
+
+  <!-- Ana Uygulama İkon Gövdesi (Squircle) -->
+  <rect x="12" y="12" width="232" height="232" rx="54" fill="url(#bgGrad)" stroke="#60A5FA" stroke-width="3" stroke-opacity="0.35" />
+
+  <!-- İç Parlama Halkası -->
+  <circle cx="72" cy="64" r="88" fill="#38BDF8" fill-opacity="0.12" />
+
+  <!-- Not Defteri Sayfası ve Cilt Sırtı -->
+  <g filter="url(#cardShadow)">
+    <rect x="54" y="46" width="128" height="164" rx="18" fill="url(#paperGrad)" />
+    <path d="M54 64C54 54.0589 62.0589 46 72 46H78V210H72C62.0589 210 54 201.941 54 192V64Z" fill="#1D4ED8" />
+  </g>
+
+  <!-- Defter Spiral Halkaları -->
+  <rect x="46" y="70" width="18" height="8" rx="4" fill="#93C5FD" />
+  <rect x="46" y="102" width="18" height="8" rx="4" fill="#93C5FD" />
+  <rect x="46" y="134" width="18" height="8" rx="4" fill="#93C5FD" />
+  <rect x="46" y="166" width="18" height="8" rx="4" fill="#93C5FD" />
+
+  <!-- Sayfa Üzerindeki Not Satırları -->
+  <line x1="92" y1="80" x2="158" y2="80" stroke="#2563EB" stroke-width="6" stroke-linecap="round" />
+  <line x1="92" y1="104" x2="148" y2="104" stroke="#64748B" stroke-width="5" stroke-linecap="round" stroke-opacity="0.65" />
+  <line x1="92" y1="126" x2="136" y2="126" stroke="#64748B" stroke-width="5" stroke-linecap="round" stroke-opacity="0.65" />
+
+  <!-- Ses Dalga İzi (Sesli Not Özelliği Vurgusu) -->
+  <rect x="92" y="152" width="6" height="16" rx="3" fill="#EF4444" />
+  <rect x="103" y="144" width="6" height="32" rx="3" fill="#EF4444" />
+  <rect x="114" y="150" width="6" height="20" rx="3" fill="#EF4444" />
+  <rect x="125" y="146" width="6" height="28" rx="3" fill="#3B82F6" />
+  <rect x="136" y="154" width="6" height="12" rx="3" fill="#3B82F6" />
+
+  <!-- S-Pen / Dolma Kalem İllüstrasyonu -->
+  <g transform="rotate(28 178 134)">
+    <rect x="164" y="52" width="26" height="114" rx="8" fill="url(#penGrad)" stroke="#FEF08A" stroke-width="2" />
+    <rect x="188" y="68" width="6" height="36" rx="3" fill="#FDE047" />
+    <rect x="164" y="152" width="26" height="10" fill="#1E293B" />
+    <path d="M166 166L188 166L181 196L177 206L173 196L166 166Z" fill="#F8FAFC" stroke="#1E293B" stroke-width="2" />
+    <line x1="177" y1="168" x2="177" y2="190" stroke="#1E293B" stroke-width="2" stroke-linecap="round" />
+    <circle cx="177" cy="190" r="2.5" fill="#1E293B" />
+  </g>
+</svg>

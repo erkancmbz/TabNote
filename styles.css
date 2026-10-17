@@ -500,16 +500,25 @@ button {
 
 /* ÜST ÇUBUK (TOPBAR) */
 .studio-topbar {
-  min-height: 54px;
-  padding: 6px 14px;
+  flex-shrink: 0;
+  min-height: 52px;
+  height: auto;
+  padding: 6px 12px;
   background: var(--bg-chrome);
   border-bottom: 1px solid var(--border-hairline);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
   z-index: 30;
+}
+
+.studio-topbar::-webkit-scrollbar {
+  display: none;
 }
 
 .topbar-left,
@@ -517,7 +526,8 @@ button {
 .topbar-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 .doc-title-group {
@@ -531,10 +541,10 @@ button {
   border: 1px solid transparent;
   border-radius: 6px;
   padding: 4px 8px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
-  width: 230px;
+  width: 170px;
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
@@ -672,17 +682,19 @@ button {
 
 .palm-reject-btn,
 .toolbar-chip-btn {
-  height: 36px;
-  padding: 0 11px;
+  height: 34px;
+  padding: 0 10px;
   border-radius: 8px;
   border: 1px solid var(--border-hairline);
   background: var(--bg-desk);
   color: var(--text-secondary);
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   transition: all 0.15s ease;
 }
 
@@ -711,6 +723,8 @@ button {
 
 /* SAMSUNG NOTES TARZI KALEM İSTASYONU (STYLUS DOCK) */
 .stylus-dock-bar {
+  flex-shrink: 0;
+  min-height: 66px;
   background: var(--bg-chrome-elevated);
   border-bottom: 1px solid var(--border-hairline);
   padding: 6px 14px;
@@ -719,6 +733,7 @@ button {
   justify-content: space-between;
   gap: 12px;
   overflow-x: auto;
+  overflow-y: hidden;
   z-index: 25;
 }
 
@@ -726,6 +741,7 @@ button {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .tool-dock-btn {
@@ -739,6 +755,7 @@ button {
   align-items: center;
   justify-content: space-between;
   color: var(--text-secondary);
+  flex-shrink: 0;
   transition: all 0.16s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -938,6 +955,7 @@ button {
 
 /* ALT ARAÇ ÇUBUKLARI (SİLGİ & ŞEKİL) */
 .sub-tool-bar {
+  flex-shrink: 0;
   background: var(--bg-chrome);
   border-bottom: 1px solid var(--border-hairline);
   padding: 7px 16px;
@@ -994,12 +1012,12 @@ button {
   flex: 1 1 0%;
   min-height: 0;
   min-width: 0;
-  height: 100%;
+  height: auto;
   display: block;
   overflow-x: auto !important;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch;
-  padding: 28px 20px 80px;
+  padding: 28px 20px 100px;
   background:
     radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06), transparent 60%),
     var(--bg-desk);
@@ -1007,11 +1025,18 @@ button {
 
 .page-scale-wrapper {
   width: 900px;
-  margin: 0 auto 480px auto;
+  margin: 0 auto 380px auto;
   transition: transform 0.08s ease-out;
 }
 
-.paper-sheet-container {
+.continuous-pages-container {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+  width: 900px;
+}
+
+.continuous-page-slot {
   position: relative;
   width: 900px;
   height: 1240px;
@@ -1019,8 +1044,82 @@ button {
   box-shadow:
     0 20px 50px rgba(0, 0, 0, 0.55),
     0 0 0 1px rgba(255, 255, 255, 0.08);
+  background: #FCFBF7;
+  overflow: hidden;
+  transition: box-shadow 0.18s ease;
+}
+
+.continuous-page-slot.active-slot {
+  box-shadow:
+    0 24px 58px rgba(0, 0, 0, 0.65),
+    0 0 0 2.5px rgba(59, 130, 246, 0.85);
+}
+
+.page-slot-badge {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 30;
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(6px);
+  color: #E2E8F0;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+}
+
+.continuous-page-slot.active-slot .page-slot-badge {
+  background: rgba(37, 99, 235, 0.9);
+  color: #FFFFFF;
+}
+
+.page-slot-preview {
+  position: absolute;
+  inset: 0;
+  width: 900px;
+  height: 1240px;
+  display: block;
+  pointer-events: auto;
+}
+
+.continuous-page-slot.active-slot .page-slot-preview {
+  display: none;
+}
+
+.paper-sheet-container {
+  position: relative;
+  width: 900px;
+  height: 1240px;
+  border-radius: 6px;
   overflow: hidden;
   background: #FCFBF7;
+}
+
+.continuous-bottom-add-wrap {
+  margin-top: 28px;
+  display: flex;
+  justify-content: center;
+}
+
+.continuous-add-page-btn {
+  padding: 14px 32px;
+  border-radius: 14px;
+  background: rgba(59, 130, 246, 0.14);
+  border: 1.5px dashed rgba(96, 165, 250, 0.55);
+  color: #93C5FD;
+  font-size: 14px;
+  font-weight: 700;
+  transition: all 0.16s ease;
+}
+
+.continuous-add-page-btn:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #60A5FA;
+  color: #FFFFFF;
+  transform: translateY(-1px);
 }
 
 .paper-canvas {
@@ -2469,17 +2568,25 @@ button {
 }
 
 .home-nb-del-btn {
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  color: var(--text-muted);
-  font-size: 13px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 7px;
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #FCA5A5;
+  font-size: 11.5px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
+  transition: all 0.14s ease;
 }
 
 .home-nb-del-btn:hover {
-  background: rgba(239, 68, 68, 0.16);
-  color: #FCA5A5;
+  background: #EF4444;
+  border-color: #EF4444;
+  color: #FFFFFF;
 }
 
 .home-nb-meta-row {
@@ -2844,4 +2951,111 @@ button {
   background: #1E293B;
   color: #FFFFFF;
 }
+
+/* ============================================================================
+   UYGULAMA LOGOSU (.brand-logo-img) & YENİ NOT DEFTERİ KURULUM MODALI
+   ============================================================================ */
+.brand-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+
+.home-brand-logo,
+.brand-logo {
+  padding: 0 !important;
+  overflow: hidden;
+  background: transparent !important;
+}
+
+.create-nb-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.create-nb-row-two {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 680px) {
+  .create-nb-row-two {
+    grid-template-columns: 1fr;
+  }
+}
+
+.create-nb-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.create-nb-folder-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.create-nb-folder-chip {
+  padding: 7px 12px;
+  border-radius: 9px;
+  background: var(--bg-desk);
+  border: 1.5px solid var(--border-hairline);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.create-nb-folder-chip.active {
+  border-color: var(--accent-primary);
+  background: rgba(59, 130, 246, 0.16);
+  color: #FFFFFF;
+}
+
+.create-nb-cover-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.create-nb-cover-swatch {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 2.5px solid transparent;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+
+.create-nb-cover-swatch:hover {
+  transform: scale(1.08);
+}
+
+.create-nb-cover-swatch.active {
+  transform: scale(1.12);
+  border-color: #FFFFFF;
+  box-shadow: 0 0 0 3px var(--accent-primary);
+}
+
+.create-nb-footer-actions {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.create-nb-submit-btn {
+  padding: 10px 20px;
+  font-size: 13.5px;
+}
+
 

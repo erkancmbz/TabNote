@@ -1,6 +1,10 @@
+<p align="center">
+  <img src="./logo.svg" alt="TabNote Studio Logo" width="110" height="110" />
+</p>
+
 # ✒️ TabNote Studio
 
-**TabNote Studio**, Android tabletler ve dokunmatik kalemli (Stylus) cihazlar için geliştirilmiş, **Samsung Notes** ve **GoodNotes** deneyiminden ilham alan profesyonel bir dijital el yazısı, PDF işaretleme ve satır bazlı sesli not alma uygulamasıdır.
+**TabNote Studio**, Android tabletler ve dokunmatik kalemli (Stylus) cihazlar için geliştirilmiş, **Samsung Notes** ve **GoodNotes** deneyiminden ilham alan profesyonel bir dijital el yazısı, sonsuz dikey PDF/sayfa kaydırma ve taşınabilir sesli not alma uygulamasıdır.
 
 ---
 
