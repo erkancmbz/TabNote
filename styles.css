@@ -1140,6 +1140,10 @@ button {
   height: 1240px;
 }
 
+.main-canvas {
+  z-index: 3;
+}
+
 .live-canvas {
   z-index: 5;
   /* Tablette kalemle yazarken tarayıcı kaydırmasını/yakınlaştırmasını engeller */
@@ -1151,7 +1155,7 @@ button {
 .dom-overlay-layer {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  z-index: 8;
   pointer-events: none;
 }
 
@@ -1224,11 +1228,12 @@ button {
   -webkit-user-select: text;
 }
 
-/* Sayfa İçi Görseller */
+/* Sayfa İçi Görseller: Kalemle üzerine yazı yazılabilmesi için z-index 2 ve pointer-events none */
 .canvas-image-item {
   position: absolute;
-  pointer-events: auto;
-  border: 2px solid transparent;
+  z-index: 2;
+  pointer-events: none;
+  border: 1.5px dashed rgba(96, 165, 250, 0.4);
   border-radius: 4px;
 }
 
@@ -1250,13 +1255,21 @@ button {
   right: 6px;
   display: flex;
   gap: 4px;
-  opacity: 0;
+  opacity: 0.85;
+  pointer-events: auto;
+  z-index: 12;
   transition: opacity 0.15s ease;
 }
 
 .canvas-image-item:hover .overlay-item-controls,
 .canvas-image-item:hover .resize-handle {
   opacity: 1;
+}
+
+.resize-handle {
+  pointer-events: auto;
+  z-index: 12;
+  opacity: 0.85;
 }
 
 .overlay-ctrl-btn {
@@ -3649,6 +3662,170 @@ button {
   .canvas-viewport {
     padding: 4px !important;
   }
+}
+
+/* ==========================================================================
+   DEVREM STUDIO EEM DEVRE SEMBOLLERİ MODALI
+   ========================================================================== */
+.devrem-dock-btn {
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+.devrem-dock-btn:hover {
+  background: rgba(245, 158, 11, 0.12) !important;
+  border-color: #F59E0B !important;
+}
+
+.devrem-dialog {
+  max-width: 820px;
+  width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.devrem-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-hairline);
+  background: var(--bg-chrome);
+}
+
+.devrem-header-branding {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.devrem-badge-bolt {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1.5px solid #F59E0B;
+  color: #F59E0B;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.devrem-category-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--bg-desk);
+  border-bottom: 1px solid var(--border-hairline);
+  overflow-x: auto;
+}
+
+.devrem-cat-btn {
+  padding: 7px 14px;
+  border-radius: 8px;
+  background: var(--bg-chrome);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.14s ease;
+}
+
+.devrem-cat-btn:hover {
+  background: var(--bg-chrome-hover);
+  color: var(--text-primary);
+}
+
+.devrem-cat-btn.active {
+  background: #111827;
+  color: #F59E0B;
+  border-color: #F59E0B;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+
+.devrem-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: calc(88vh - 180px);
+}
+
+.devrem-symbols-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.devrem-symbol-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 10px;
+  border-radius: 12px;
+  background: #FFFFFF;
+  border: 1.5px solid #E2E8F0;
+  cursor: pointer;
+  transition: all 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.devrem-symbol-card:hover {
+  border-color: #3B82F6;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.12);
+}
+
+.devrem-symbol-preview {
+  width: 100%;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.devrem-symbol-preview svg {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+}
+
+.devrem-symbol-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1E293B;
+  text-align: center;
+}
+
+.devrem-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--bg-chrome);
+  border-top: 1px solid var(--border-hairline);
+}
+
+.devrem-footer-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Yeni Klasör Çipi Butonu */
+.add-folder-chip-btn {
+  border-style: dashed !important;
+  border-color: #3B82F6 !important;
+  color: #60A5FA !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+
+.add-folder-chip-btn:hover {
+  background: rgba(59, 130, 246, 0.2) !important;
+  color: #FFFFFF !important;
 }
 
 

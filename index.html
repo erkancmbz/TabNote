@@ -409,6 +409,14 @@
             <span class="tool-label">Grafik</span>
           </button>
 
+          <!-- DEVREM EEM DEVRE SEMBOLLERİ -->
+          <button type="button" id="openDevremModalBtn" class="tool-dock-btn devrem-dock-btn" title="Devrem EEM: Devre Şeması Sembolü Ekle (direnç, op-amp, transistör, lojik kapı)">
+            <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M13 2 L3 14 L12 14 L11 22 L21 10 L12 10 Z" fill="#F59E0B" fill-opacity="0.2"/>
+            </svg>
+            <span class="tool-label" style="color:#F59E0B;font-weight:700;">⚡ Devrem</span>
+          </button>
+
           <!-- MİKROFON, SES VE NOT KAYDET -->
           <button type="button" id="openVoiceStudioModalBtn" class="tool-dock-btn voice-dock-trigger" title="Mikrofon, Ses ve Not Kaydet">
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.2">
@@ -905,6 +913,38 @@
           <button type="button" id="cancelCreateNbBtn" class="btn-secondary-sm">İptal</button>
           <button type="button" id="confirmCreateNbBtn" class="btn-primary-sm create-nb-submit-btn">✨ Not Defterini Oluştur ve Aç</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 5: DEVREM STUDIO EEM DEVRE SEMBOLLERİ MODALI -->
+  <div id="devremModal" class="modal-backdrop hidden">
+    <div class="modal-dialog devrem-dialog">
+      <div class="modal-header devrem-modal-header">
+        <div class="devrem-header-branding">
+          <span class="devrem-badge-bolt">⚡</span>
+          <div>
+            <h3>Devrem Studio — Devre Şeması Bileşenleri</h3>
+            <p class="modal-sub">Sayfanıza profesyonel devre elemanı ekleyin; üzerine kalemle hatlar ve formüller çizin.</p>
+          </div>
+        </div>
+        <button type="button" id="closeDevremModalBtn" class="icon-btn">✕</button>
+      </div>
+      <div class="devrem-category-bar">
+        <button type="button" class="devrem-cat-btn active" data-cat="all">Tüm Bileşenler</button>
+        <button type="button" class="devrem-cat-btn" data-cat="Pasif Elemanlar">Pasifler (R, L, C)</button>
+        <button type="button" class="devrem-cat-btn" data-cat="Yarıiletkenler">Yarıiletkenler (Diyot, BJT, LED)</button>
+        <button type="button" class="devrem-cat-btn" data-cat="Entegreler & Lojik">Op-Amp & Lojik Kapılar</button>
+        <button type="button" class="devrem-cat-btn" data-cat="Kaynaklar & Toprak">Kaynaklar & GND</button>
+      </div>
+      <div class="devrem-modal-body">
+        <div id="devremSymbolsGrid" class="devrem-symbols-grid"></div>
+      </div>
+      <div class="devrem-modal-footer">
+        <div class="devrem-footer-hint">
+          <span>💡 Eklenen devre elemanını sayfada taşıyabilir ve boyutlandırabilirsiniz.</span>
+        </div>
+        <button type="button" id="devremCloseBtn" class="btn-secondary-sm">Kapat</button>
       </div>
     </div>
   </div>

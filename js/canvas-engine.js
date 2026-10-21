@@ -382,10 +382,10 @@ export class CanvasEngine {
     const surface = this.liveCanvas;
     this.isOverlayDragging = false;
 
-    surface.addEventListener('pointerdown', (e) => this.handlePointerDown(e));
-    surface.addEventListener('pointermove', (e) => this.handlePointerMove(e));
-    surface.addEventListener('pointerup', (e) => this.handlePointerUp(e));
-    surface.addEventListener('pointercancel', (e) => this.handlePointerUp(e));
+    surface.addEventListener('pointerdown', (e) => this.handlePointerDown(e), { passive: false });
+    surface.addEventListener('pointermove', (e) => this.handlePointerMove(e), { passive: false });
+    surface.addEventListener('pointerup', (e) => this.handlePointerUp(e), { passive: false });
+    surface.addEventListener('pointercancel', (e) => this.handlePointerUp(e), { passive: false });
 
     this.viewportEl.addEventListener('pointerdown', (e) => {
       if (this.isOverlayDragging || this.selectionDragMode || this.isDrawing) return;
@@ -644,6 +644,8 @@ export class CanvasEngine {
 
     this.tempBarrelEraser = e.pointerType === 'pen' && (e.buttons === 32 || e.button === 5);
 
+    if (e.cancelable) e.preventDefault();
+
     this.activeCanvasRect = this.liveCanvas.getBoundingClientRect();
     this.isDrawing = true;
     this.activePointerId = e.pointerId;
@@ -737,6 +739,7 @@ export class CanvasEngine {
     }
 
     if (!this.isDrawing || e.pointerId !== this.activePointerId) return;
+    if (e.cancelable) e.preventDefault();
 
     const effectiveTool = this.tempBarrelEraser ? 'eraser' : this.tool;
     const events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [e];
@@ -778,7 +781,7 @@ export class CanvasEngine {
         continue;
       }
 
-      if (prevPt && Math.hypot(newPoint.x - prevPt.x, newPoint.y - prevPt.y) < 1.1) {
+      if (prevPt && Math.hypot(newPoint.x - prevPt.x, newPoint.y - prevPt.y) < 0.6) {
         continue;
       }
 
@@ -787,8 +790,11 @@ export class CanvasEngine {
         this.snappedShapePreview.y2 = newPoint.y;
       } else {
         this.currentPoints.push(newPoint);
-        this.scheduleAutoShapeHold();
       }
+    }
+
+    if (!this.snappedShapePreview && effectiveTool !== 'eraser' && effectiveTool !== 'lasso') {
+      this.scheduleAutoShapeHold();
     }
 
     if (effectiveTool === 'eraser' || effectiveTool === 'laser') {
@@ -963,7 +969,7 @@ export class CanvasEngine {
     const now = performance.now();
     if (e.pointerType === 'pen' && typeof e.pressure === 'number' && e.pressure > 0) {
       const clamped = Math.max(0.12, Math.min(1.0, e.pressure));
-      if (now - this.lastPressureHudTime > 140) {
+      if (now - this.lastPressureHudTime > 400) {
         this.lastPressureHudTime = now;
         this.onStatusUpdate({ pressure: Math.round(clamped * 100) });
       }

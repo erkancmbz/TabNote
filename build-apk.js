@@ -32,6 +32,11 @@ const chartCode = fs
   .replace(/export\s+const\s+/g, 'const ')
   .replace(/export\s+function\s+/g, 'function ');
 
+const devremSymbolsCode = fs
+  .readFileSync(path.join(__dirname, 'js', 'devrem-symbols.js'), 'utf8')
+  .replace(/export\s+const\s+/g, 'const ')
+  .replace(/export\s+function\s+/g, 'function ');
+
 const engineCode = fs
   .readFileSync(path.join(__dirname, 'js', 'canvas-engine.js'), 'utf8')
   .replace(/import\s+\{[^}]+\}\s+from\s+['"][^'"]+['"];?/g, '')
@@ -42,7 +47,7 @@ const appCode = fs
   .readFileSync(path.join(__dirname, 'js', 'app.js'), 'utf8')
   .replace(/import\s+\{[^}]+\}\s+from\s+['"][^'"]+['"];?/g, '');
 
-const combinedBundle = `/* TabNote Studio Android Bundle */\n(function(){\n${templatesCode}\n${storageCode}\n${chartCode}\n${engineCode}\n${appCode}\n})();\n`;
+const combinedBundle = `/* TabNote Studio Android Bundle */\n(function(){\n${templatesCode}\n${storageCode}\n${chartCode}\n${devremSymbolsCode}\n${engineCode}\n${appCode}\n})();\n`;
 
 fs.writeFileSync(path.join(assetsDir, 'bundle.js'), combinedBundle, 'utf8');
 
@@ -116,7 +121,8 @@ const manifestXml = `<?xml version="1.0" encoding="utf-8"?>
         <activity
             android:name="com.tabnote.studio.MainActivity"
             android:exported="true"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|uiMode"
+            android:screenOrientation="fullSensor"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -146,6 +152,8 @@ import android.os.Bundle;
 import android.util.Base64;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
+import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
@@ -269,6 +277,38 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void applyImmersiveMode() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                final Window window = getWindow();
+                window.setDecorFitsSystemWindows(false);
+                final WindowInsetsController controller = window.getInsetsController();
+                if (controller != null) {
+                    controller.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+                    controller.setSystemBarsBehavior(WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                }
+            } else {
+                View decorView = getWindow().getDecorView();
+                decorView.setSystemUiVisibility(
+                    View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_FULLSCREEN
+                );
+            }
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            applyImmersiveMode();
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -277,6 +317,15 @@ public class MainActivity extends Activity {
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         );
+        applyImmersiveMode();
+        getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
+            @Override
+            public void onSystemUiVisibilityChange(int visibility) {
+                if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
+                    applyImmersiveMode();
+                }
+            }
+        });
 
         webView = new WebView(this);
         WebSettings settings = webView.getSettings();

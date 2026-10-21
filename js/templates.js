@@ -11,6 +11,8 @@ export const PAPER_TEMPLATES = [
   { id: 'cornell', name: 'Cornell Not Sistemi', desc: 'Sol ipucu sütunu, ana not alanı ve alt özet bölümü', icon: 'cornell' },
   { id: 'blank', name: 'Düz Kağıt', desc: 'Serbest eskiz ve diyagramlar için çizgisiz yüzey', icon: 'blank' },
   { id: 'isometric', name: 'İzometrik Noktalı', desc: '3B teknik çizim ve mimari eskiz matrisi', icon: 'isometric' },
+  { id: 'engineering-grid', name: 'Milimetrik EEM Kağıdı (Devrem)', desc: 'Elektrik-elektronik devre şeması ve laboratuvar ölçümleri için çift katmanlı milimetrik ızgara', icon: 'grid' },
+  { id: 'smith-chart', name: 'Polar & Smith Şeması (Devrem)', desc: 'RF, empedans eşleme ve fazör analizleri için konsantrik halkalı polar ızgara', icon: 'isometric' },
   { id: 'planner', name: 'Günlük / Görev Planı', desc: 'Saat çizelgesi, öncelikli işler ve kontrol listesi', icon: 'planner' },
   { id: 'music', name: 'Müzik Portesi', desc: 'Beste ve nota yazımı için 5 çizgili porte dizisi', icon: 'music' }
 ];
@@ -324,6 +326,109 @@ export function renderPaperBackground(ctx, width, height, templateId = 'ruled', 
         ctx.lineTo(44.5, s + 4 * lineGap);
         ctx.moveTo(width - 44.5, s);
         ctx.lineTo(width - 44.5, s + 4 * lineGap);
+        ctx.stroke();
+      }
+      break;
+    }
+
+    case 'engineering-grid': {
+      const margin = 44;
+      const smallStep = 8;
+      const majorStep = 40;
+
+      // İnce milimetrik ızgara
+      ctx.strokeStyle = palette.line;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      for (let x = margin; x <= width - margin; x += smallStep) {
+        ctx.moveTo(Math.floor(x) + 0.5, margin);
+        ctx.lineTo(Math.floor(x) + 0.5, height - margin);
+      }
+      for (let y = margin; y <= height - margin; y += smallStep) {
+        ctx.moveTo(margin, Math.floor(y) + 0.5);
+        ctx.lineTo(width - margin, Math.floor(y) + 0.5);
+      }
+      ctx.stroke();
+
+      // Ana 5mm/Devre ızgarası
+      ctx.strokeStyle = palette.accentLine;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      for (let x = margin; x <= width - margin; x += majorStep) {
+        ctx.moveTo(Math.floor(x) + 0.5, margin);
+        ctx.lineTo(Math.floor(x) + 0.5, height - margin);
+      }
+      for (let y = margin; y <= height - margin; y += majorStep) {
+        ctx.moveTo(margin, Math.floor(y) + 0.5);
+        ctx.lineTo(width - margin, Math.floor(y) + 0.5);
+      }
+      // Dış çerçeve
+      ctx.strokeRect(margin + 0.5, margin + 0.5, width - margin * 2, height - margin * 2);
+      ctx.stroke();
+
+      // EEM Devrem Başlık Şeridi
+      ctx.fillStyle = palette.textMuted;
+      ctx.font = '600 11px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('⚡ DEVREM EEM LABORATUVAR & DEVRE ŞEMASI KAĞIDI', margin + 4, margin - 12);
+      break;
+    }
+
+    case 'smith-chart': {
+      const centerX = width / 2;
+      const centerY = height * 0.46;
+      const maxRadius = Math.min(width, height) * 0.38;
+
+      ctx.strokeStyle = palette.line;
+      ctx.lineWidth = 0.8;
+
+      // Konsantrik polar halkalar
+      for (let r = maxRadius * 0.2; r <= maxRadius; r += maxRadius * 0.2) {
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Smith chart teğet empedans daireleri
+      const rVals = [0.2, 0.5, 1.0, 2.0, 5.0];
+      for (const r of rVals) {
+        const radius = maxRadius / (1 + r);
+        const cx = centerX + maxRadius - radius;
+        ctx.beginPath();
+        ctx.arc(cx, centerY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Açısal / fazör ışınları (30 derecede bir)
+      for (let deg = 0; deg < 360; deg += 30) {
+        const rad = (deg * Math.PI) / 180;
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(centerX + Math.cos(rad) * maxRadius, centerY + Math.sin(rad) * maxRadius);
+        ctx.stroke();
+      }
+
+      // Ana polar eksen
+      ctx.strokeStyle = palette.accentLine;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(centerX - maxRadius - 20, centerY);
+      ctx.lineTo(centerX + maxRadius + 20, centerY);
+      ctx.moveTo(centerX, centerY - maxRadius - 20);
+      ctx.lineTo(centerX, centerY + maxRadius + 20);
+      ctx.stroke();
+
+      // Alt not çizgileri
+      const bottomY = centerY + maxRadius + 48;
+      ctx.fillStyle = palette.textMuted;
+      ctx.font = '600 12px "Plus Jakarta Sans", sans-serif';
+      ctx.fillText('⚡ DEVREM RF & POLAR ANALİZ GRAFİĞİ | EMPEDANS / FAZÖR HESAPLARI', 56, bottomY);
+
+      ctx.strokeStyle = palette.line;
+      ctx.lineWidth = 1;
+      for (let y = bottomY + 28; y < height - 50; y += 36) {
+        ctx.beginPath();
+        ctx.moveTo(56, Math.floor(y) + 0.5);
+        ctx.lineTo(width - 56, Math.floor(y) + 0.5);
         ctx.stroke();
       }
       break;

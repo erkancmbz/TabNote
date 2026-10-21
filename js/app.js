@@ -7,6 +7,7 @@ import { storage } from './storage.js';
 import { PAPER_TEMPLATES, PAPER_COLORS, renderPaperBackground } from './templates.js';
 import { CanvasEngine, PAGE_WIDTH, PAGE_HEIGHT } from './canvas-engine.js';
 import { drawChart, renderChartDataUrl, compileFunction, CHART_COLORS } from './chart-builder.js';
+import { DEVREM_SYMBOLS, svgToDataUrl } from './devrem-symbols.js';
 
 const SETTINGS_KEY = 'tabnote_studio_settings_v1';
 const DEFAULT_SETTINGS = {
@@ -96,6 +97,7 @@ class TabNoteApp {
     this.initCanvasEngine();
     this.bindUIEvents();
     this.bindDockAndSettings();
+    this.bindDevremEvents();
     this.renderSidebar();
     this.renderHomeScreen();
     this.loadActiveNotebookIntoWorkspace();
@@ -267,6 +269,13 @@ class TabNoteApp {
         bgImg
       );
       if (this.engine) {
+        for (const im of pg.images || []) {
+          if (im.src) {
+            const imEl = new Image();
+            imEl.onload = () => ctx.drawImage(imEl, im.x, im.y, im.width, im.height);
+            imEl.src = im.src;
+          }
+        }
         for (const st of pg.strokes || []) {
           this.engine.drawStroke(ctx, st);
         }
@@ -453,14 +462,14 @@ class TabNoteApp {
     }, 1100);
   }
 
-  promptCreateNewFolder() {
+  promptCreateNewFolder(onComplete = null) {
     this.openPromptModal({
       title: 'Yeni Klasör Oluştur',
-      placeholder: 'Örn: Fizik 101, Müşteri Notları...',
+      placeholder: 'Örn: EEM Devre Analizi, Fizik 101, Müşteri Notları...',
       defaultValue: '',
       onConfirm: async (folderName) => {
         if (!folderName.trim()) return;
-        const colors = ['#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F59E0B', '#06B6D4'];
+        const colors = ['#3B82F6', '#10B981', '#8B5CF6', '#EC4899', '#F59E0B', '#06B6D4', '#EF4444'];
         const newFolder = {
           id: `fld-${Date.now()}`,
           name: folderName.trim(),
@@ -474,6 +483,9 @@ class TabNoteApp {
         this.renderSidebar();
         this.renderHomeScreen();
         this.showToast(`"${newFolder.name}" klasörü oluşturuldu.`);
+        if (typeof onComplete === 'function') {
+          onComplete(newFolder);
+        }
       }
     });
   }
@@ -1770,6 +1782,77 @@ class TabNoteApp {
     });
   }
 
+  /**
+   * DEVREM STUDIO EEM DEVRE SEMBOLLERİ
+   */
+  openDevremModal() {
+    this.renderDevremSymbols('all');
+    document.getElementById('devremModal')?.classList.remove('hidden');
+  }
+
+  closeDevremModal() {
+    document.getElementById('devremModal')?.classList.add('hidden');
+  }
+
+  renderDevremSymbols(category = 'all') {
+    const grid = document.getElementById('devremSymbolsGrid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const list = category === 'all'
+      ? DEVREM_SYMBOLS
+      : DEVREM_SYMBOLS.filter((s) => s.category === category);
+
+    for (const sym of list) {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'devrem-symbol-card';
+      card.title = `${sym.name} sayfaya ekle`;
+      card.innerHTML = `
+        <div class="devrem-symbol-preview">
+          ${sym.svg}
+        </div>
+        <span class="devrem-symbol-name">${sym.name}</span>
+      `;
+
+      card.addEventListener('click', () => {
+        this.insertDevremSymbol(sym);
+      });
+
+      grid.appendChild(card);
+    }
+  }
+
+  insertDevremSymbol(symbolObj) {
+    if (!this.engine || !this.activeNotebook) return;
+    const dataUrl = svgToDataUrl(symbolObj.svg);
+    this.engine.addImageToPage(dataUrl, 0, symbolObj.width || 140);
+    this.closeDevremModal();
+    this.showToast(`⚡ ${symbolObj.name} devre sembolü sayfaya eklendi.`);
+  }
+
+  bindDevremEvents() {
+    document.getElementById('openDevremModalBtn')?.addEventListener('click', () => {
+      this.openDevremModal();
+    });
+
+    ['closeDevremModalBtn', 'devremCloseBtn'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('click', () => this.closeDevremModal());
+    });
+
+    document.getElementById('devremModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'devremModal') this.closeDevremModal();
+    });
+
+    document.querySelectorAll('.devrem-cat-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.devrem-cat-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.renderDevremSymbols(btn.dataset.cat);
+      });
+    });
+  }
+
   setInkColor(hex) {
     this.engine.color = hex;
     document.getElementById('customColorPicker').value = hex;
@@ -2297,6 +2380,21 @@ class TabNoteApp {
           });
           folderChipsEl.appendChild(chip);
         }
+
+        const addFldBtn = document.createElement('button');
+        addFldBtn.type = 'button';
+        addFldBtn.className = 'create-nb-folder-chip add-folder-chip-btn';
+        addFldBtn.innerHTML = `<span>+ Yeni Klasör Ekle</span>`;
+        addFldBtn.addEventListener('click', () => {
+          this.promptCreateNewFolder((created) => {
+            if (created) {
+              customFolders.push(created);
+              draft.folderId = created.id;
+              renderDraftChoices();
+            }
+          });
+        });
+        folderChipsEl.appendChild(addFldBtn);
       }
 
       // 2. Kapak renkleri
