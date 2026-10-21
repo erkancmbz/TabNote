@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tabnote-studio-v3';
+const CACHE_NAME = 'tabnote-studio-v4';
 const ASSETS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const ASSETS = [
   './js/canvas-engine.js',
   './js/chart-builder.js',
   './js/devrem-symbols.js',
+  './js/devrem-lab.js',
   './js/app.js'
 ];
 

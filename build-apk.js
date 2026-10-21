@@ -37,6 +37,10 @@ const devremSymbolsCode = fs
   .replace(/export\s+const\s+/g, 'const ')
   .replace(/export\s+function\s+/g, 'function ');
 
+const devremLabCode = fs
+  .readFileSync(path.join(__dirname, 'js', 'devrem-lab.js'), 'utf8')
+  .replace(/export\s+class\s+/g, 'class ');
+
 const engineCode = fs
   .readFileSync(path.join(__dirname, 'js', 'canvas-engine.js'), 'utf8')
   .replace(/import\s+\{[^}]+\}\s+from\s+['"][^'"]+['"];?/g, '')
@@ -47,7 +51,7 @@ const appCode = fs
   .readFileSync(path.join(__dirname, 'js', 'app.js'), 'utf8')
   .replace(/import\s+\{[^}]+\}\s+from\s+['"][^'"]+['"];?/g, '');
 
-const combinedBundle = `/* TabNote Studio Android Bundle */\n(function(){\n${templatesCode}\n${storageCode}\n${chartCode}\n${devremSymbolsCode}\n${engineCode}\n${appCode}\n})();\n`;
+const combinedBundle = `/* TabNote Studio Android Bundle */\n(function(){\n${templatesCode}\n${storageCode}\n${chartCode}\n${devremSymbolsCode}\n${devremLabCode}\n${engineCode}\n${appCode}\n})();\n`;
 
 fs.writeFileSync(path.join(assetsDir, 'bundle.js'), combinedBundle, 'utf8');
 
@@ -103,8 +107,8 @@ fs.writeFileSync(path.join(resDrawableDir, 'ic_launcher.xml'), icLauncherXml, 'u
 const manifestXml = `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.tabnote.studio"
-    android:versionCode="6"
-    android:versionName="1.5.0">
+    android:versionCode="7"
+    android:versionName="1.6.0">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -337,8 +341,8 @@ public class MainActivity extends Activity {
         settings.setAllowFileAccessFromFileURLs(true);
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setLoadWithOverviewMode(true);
-        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(false);
+        settings.setUseWideViewPort(false);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
 

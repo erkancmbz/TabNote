@@ -1141,21 +1141,28 @@ button {
 }
 
 .main-canvas {
-  z-index: 3;
+  z-index: 1;
+}
+
+.dom-images-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
 }
 
 .live-canvas {
-  z-index: 5;
+  z-index: 6;
   /* Tablette kalemle yazarken tarayıcı kaydırmasını/yakınlaştırmasını engeller */
   touch-action: none;
   cursor: crosshair;
 }
 
-/* DOM Katmanı: Metin Kutuları ve Görseller */
+/* DOM Katmanı: Metin Kutuları ve Ses Kartları */
 .dom-overlay-layer {
   position: absolute;
   inset: 0;
-  z-index: 8;
+  z-index: 10;
   pointer-events: none;
 }
 
@@ -3827,6 +3834,238 @@ button {
   background: rgba(59, 130, 246, 0.2) !important;
   color: #FFFFFF !important;
 }
+
+/* ==========================================================================
+   GRAFİK & DEVREM LAB MODERN STİLLERİ
+   ========================================================================== */
+
+/* Hazır Şablon Hapları (Chart Preset Pills) */
+.chart-preset-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-chrome-elevated);
+  border: 1px solid var(--border-hairline);
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  white-space: nowrap;
+}
+
+.chart-preset-pill:hover {
+  background: var(--bg-chrome-hover);
+  color: var(--text-primary);
+  border-color: #3B82F6;
+  transform: translateY(-1px);
+}
+
+.chart-preset-pill.active {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #3B82F6;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+}
+
+/* Devrem Studio Ana Sekmeler */
+.devrem-main-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--bg-chrome);
+  border-bottom: 1px solid var(--border-hairline);
+  overflow-x: auto;
+}
+
+.devrem-tab-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.devrem-tab-pill:hover {
+  background: var(--bg-chrome-elevated);
+  color: var(--text-primary);
+}
+
+.devrem-tab-pill.active {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: #60A5FA;
+}
+
+/* Devrem Sekme İçerikleri & Sim Grid */
+.devrem-tab-pane {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.devrem-tab-pane.active {
+  display: block;
+}
+
+.devrem-sim-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 16px;
+  height: 100%;
+}
+
+@media (max-width: 900px) {
+  .devrem-sim-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.devrem-canvas-card {
+  background: #0F172A;
+  border: 1px solid var(--border-hairline);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  min-height: 380px;
+  overflow: hidden;
+}
+
+.devrem-canvas-card canvas {
+  max-width: 100%;
+  max-height: 100%;
+  display: block;
+  border-radius: 8px;
+  background: #0F172A;
+}
+
+.devrem-controls-card {
+  background: var(--bg-chrome);
+  border: 1px solid var(--border-hairline);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.devrem-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #2563EB;
+  color: #FFFFFF;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+  border: none;
+}
+
+.devrem-action-btn:hover {
+  background: #1D4ED8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+}
+
+/* Karnaugh Haritası Hücreleri */
+.kmap-table {
+  border-collapse: separate;
+  border-spacing: 4px;
+  margin: 12px auto;
+}
+
+.kmap-table th {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.kmap-cell {
+  width: 44px;
+  height: 44px;
+  background: var(--bg-chrome-elevated);
+  border: 1.5px solid var(--border-hairline);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  position: relative;
+}
+
+.kmap-cell:hover {
+  border-color: #60A5FA;
+  transform: scale(1.05);
+}
+
+.kmap-cell.one {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10B981;
+  color: #34D399;
+}
+
+.kmap-cell.dc {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: #F59E0B;
+  color: #FBBF24;
+}
+
+.kmap-cell .cell-minterm {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 9px;
+  color: var(--text-muted);
+  font-weight: normal;
+}
+
+/* Sonuç Kartı */
+.devrem-results-box {
+  background: var(--bg-desk);
+  border: 1px solid var(--border-hairline);
+  border-radius: 8px;
+  padding: 12px;
+  font-family: 'Fira Code', monospace, sans-serif;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.devrem-results-box h4 {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.devrem-results-box .accent-text {
+  color: #60A5FA;
+  font-weight: 700;
+  font-size: 14px;
+}
+
 
 
 

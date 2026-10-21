@@ -536,6 +536,7 @@
           <div id="continuousPagesContainer" class="continuous-pages-container">
             <div class="paper-sheet-container">
               <canvas id="mainCanvas" class="paper-canvas main-canvas"></canvas>
+              <div id="domImagesLayer" class="dom-images-layer"></div>
               <canvas id="liveCanvas" class="paper-canvas live-canvas"></canvas>
               <div id="domOverlayLayer" class="dom-overlay-layer"></div>
 
@@ -635,13 +636,25 @@
     <div class="modal-dialog modal-lg chart-dialog">
       <div class="modal-header">
         <div>
-          <h3>📊 Grafik Ekle</h3>
-          <p class="modal-sub">Grafik türünü seçin, verilerinizi girin; grafik sayfaya taşınabilir ve boyutlandırılabilir görsel olarak eklenir.</p>
+          <h3>📊 Akıllı Grafik Sihirbazı</h3>
+          <p class="modal-sub">Hazır şablonlardan birine tıklayın veya verilerinizi girin; grafik anında sayfaya taşınabilir görsel kartı olarak eklenir.</p>
         </div>
         <button type="button" id="closeChartModalBtn" class="icon-btn">✕</button>
       </div>
       <div class="modal-body chart-body">
         <div class="chart-form">
+          <!-- HIZLI HAZIR ŞABLONLAR -->
+          <h4 class="modal-section-label">⚡ Hızlı Hazır Grafik Şablonları (1 Tıkla Hazırla)</h4>
+          <div class="chart-presets-row" id="chartPresetsRow">
+            <button type="button" class="chart-preset-pill" data-preset="sales">📊 Haftalık Satış</button>
+            <button type="button" class="chart-preset-pill" data-preset="trend">📈 Zaman Trendi</button>
+            <button type="button" class="chart-preset-pill" data-preset="budget">🥧 Bütçe Dağılımı</button>
+            <button type="button" class="chart-preset-pill" data-preset="parabola">📐 Parabol (x²)</button>
+            <button type="button" class="chart-preset-pill" data-preset="sine">🌊 Sinüs Dalgası</button>
+            <button type="button" class="chart-preset-pill" data-preset="gauss">🔔 Gauss Çanı</button>
+            <button type="button" class="chart-preset-pill" data-preset="exp">🚀 Üstel Artış (eˣ)</button>
+          </div>
+
           <h4 class="modal-section-label">Grafik Türü</h4>
           <div class="chart-type-row" id="chartTypeRow">
             <button type="button" class="chart-type-btn active" data-chart-type="bar">📊 Çubuk</button>
@@ -654,7 +667,7 @@
           <input type="text" id="chartTitleInput" class="modal-text-input" placeholder="Örn: Aylık Satışlar" value="Aylık Satışlar" />
 
           <div id="chartDataPanel">
-            <h4 class="modal-section-label">Veriler</h4>
+            <h4 class="modal-section-label">Veriler &amp; Etiketler</h4>
             <div id="chartDataRows" class="chart-data-rows"></div>
             <button type="button" id="chartAddRowBtn" class="btn-secondary-sm">+ Satır Ekle</button>
           </div>
@@ -669,19 +682,21 @@
             <p class="chart-hint">Kullanılabilir: + − * / ^ ( ) sin cos tan sqrt abs ln log exp pi</p>
           </div>
 
-          <h4 class="modal-section-label">Renk</h4>
+          <h4 class="modal-section-label">Tema Rengi</h4>
           <div id="chartColorSwatches" class="chart-color-swatches"></div>
         </div>
 
         <div class="chart-preview-wrap">
-          <h4 class="modal-section-label">Önizleme</h4>
-          <canvas id="chartPreviewCanvas" width="360" height="240"></canvas>
+          <h4 class="modal-section-label">Canlı Önizleme</h4>
+          <div class="chart-preview-card">
+            <canvas id="chartPreviewCanvas" width="400" height="260"></canvas>
+          </div>
           <p id="chartErrorText" class="chart-hint chart-error hidden"></p>
+          <button type="button" id="chartInsertBtn" class="btn-primary-sm chart-insert-big-btn">✨ Bu Grafiği Sayfaya Ekle</button>
         </div>
       </div>
       <div class="modal-actions chart-footer">
-        <button type="button" id="chartCancelBtn" class="btn-secondary-sm">İptal</button>
-        <button type="button" id="chartInsertBtn" class="btn-primary-sm">✓ Sayfaya Ekle</button>
+        <button type="button" id="chartCancelBtn" class="btn-secondary-sm">Kapat</button>
       </div>
     </div>
   </div>
@@ -917,32 +932,117 @@
     </div>
   </div>
 
-  <!-- MODAL 5: DEVREM STUDIO EEM DEVRE SEMBOLLERİ MODALI -->
+  <!-- MODAL 5: DEVREM STUDIO EEM LABORATUVARI & SİMÜLATÖRLERİ -->
   <div id="devremModal" class="modal-backdrop hidden">
     <div class="modal-dialog devrem-dialog">
       <div class="modal-header devrem-modal-header">
         <div class="devrem-header-branding">
           <span class="devrem-badge-bolt">⚡</span>
           <div>
-            <h3>Devrem Studio — Devre Şeması Bileşenleri</h3>
-            <p class="modal-sub">Sayfanıza profesyonel devre elemanı ekleyin; üzerine kalemle hatlar ve formüller çizin.</p>
+            <h3>Devrem Studio — EEM Laboratuvarı &amp; Simülatörleri</h3>
+            <p class="modal-sub">Karnaugh haritası, transformatör ve RLC devre simülasyonlarını canlı inceleyin ve tek tıkla not defterinize ekleyin.</p>
           </div>
         </div>
         <button type="button" id="closeDevremModalBtn" class="icon-btn">✕</button>
       </div>
-      <div class="devrem-category-bar">
-        <button type="button" class="devrem-cat-btn active" data-cat="all">Tüm Bileşenler</button>
-        <button type="button" class="devrem-cat-btn" data-cat="Pasif Elemanlar">Pasifler (R, L, C)</button>
-        <button type="button" class="devrem-cat-btn" data-cat="Yarıiletkenler">Yarıiletkenler (Diyot, BJT, LED)</button>
-        <button type="button" class="devrem-cat-btn" data-cat="Entegreler & Lojik">Op-Amp & Lojik Kapılar</button>
-        <button type="button" class="devrem-cat-btn" data-cat="Kaynaklar & Toprak">Kaynaklar & GND</button>
+
+      <div class="devrem-main-tabs">
+        <button type="button" class="devrem-tab-btn active" data-tab="kmap">🧩 Karnaugh Haritası (K-Map)</button>
+        <button type="button" class="devrem-tab-btn" data-tab="transformer">🔄 Transformatör Simülatörü</button>
+        <button type="button" class="devrem-tab-btn" data-tab="rlc">📈 RLC Rezonans &amp; Filtre</button>
+        <button type="button" class="devrem-tab-btn" data-tab="symbols">⚡ Devre Elemanları (R, C, L, Op-Amp)</button>
       </div>
+
       <div class="devrem-modal-body">
-        <div id="devremSymbolsGrid" class="devrem-symbols-grid"></div>
+        <!-- SEKME 1: KARNAUGH HARİTASI (K-MAP) -->
+        <div id="devremKmapPane" class="devrem-tab-pane">
+          <div class="devrem-pane-top-row">
+            <span class="pane-instruction">Değişken sayısını seçin ve 1 yapmak istediğiniz hücrelere dokunun:</span>
+            <div class="devrem-var-selector">
+              <button type="button" class="devrem-var-btn" data-vars="2">2 Değişken (A, B)</button>
+              <button type="button" class="devrem-var-btn active" data-vars="3">3 Değişken (A, B, C)</button>
+              <button type="button" class="devrem-var-btn" data-vars="4">4 Değişken (A, B, C, D)</button>
+            </div>
+          </div>
+          <div class="kmap-interactive-wrap">
+            <div id="kmapInteractiveGrid" class="kmap-interactive-grid"></div>
+            <div class="kmap-result-box">
+              <span class="kmap-res-label">Sadeleştirilmiş Boolean Çözümü:</span>
+              <div id="kmapResultExpr" class="kmap-res-expr">Y = ...</div>
+              <p id="kmapResultMinterms" class="kmap-res-meta">Mintermler: ...</p>
+              <button type="button" id="insertKmapToPageBtn" class="btn-primary-sm devrem-insert-btn">📄 Karnaugh Haritasını &amp; Çözümünü Sayfaya Ekle</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEKME 2: TRANSFORMATÖR SİMÜLATÖRÜ -->
+        <div id="devremTransformerPane" class="devrem-tab-pane hidden">
+          <div class="devrem-sim-grid">
+            <div class="devrem-sim-controls">
+              <label class="devrem-ctrl-row">
+                <span>Primer Gerilimi (V₁) [Volt]:</span>
+                <input type="number" id="trV1Input" class="modal-text-input" value="220" />
+              </label>
+              <label class="devrem-ctrl-row">
+                <span>Primer Sarım (N₁):</span>
+                <input type="number" id="trN1Input" class="modal-text-input" value="1000" />
+              </label>
+              <label class="devrem-ctrl-row">
+                <span>Sekonder Sarım (N₂):</span>
+                <input type="number" id="trN2Input" class="modal-text-input" value="100" />
+              </label>
+              <label class="devrem-ctrl-row">
+                <span>Yük Direnci (R_L) [Ω]:</span>
+                <input type="number" id="trRlInput" class="modal-text-input" value="10" />
+              </label>
+              <button type="button" id="insertTransformerToPageBtn" class="btn-primary-sm devrem-insert-btn">📄 Transformatör Şemasını &amp; Analizini Sayfaya Ekle</button>
+            </div>
+            <div class="devrem-sim-preview-card">
+              <div id="transformerPreviewDetails" class="transformer-preview-details"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEKME 3: RLC REZONANS VE FİLTRE -->
+        <div id="devremRlcPane" class="devrem-tab-pane hidden">
+          <div class="devrem-sim-grid">
+            <div class="devrem-sim-controls">
+              <label class="devrem-ctrl-row">
+                <span>Direnç (R) [Ω]:</span>
+                <input type="number" id="rlcRInput" class="modal-text-input" value="100" />
+              </label>
+              <label class="devrem-ctrl-row">
+                <span>İndüktans / Bobin (L) [mH]:</span>
+                <input type="number" id="rlcLInput" class="modal-text-input" value="10" />
+              </label>
+              <label class="devrem-ctrl-row">
+                <span>Kapasite (C) [nF]:</span>
+                <input type="number" id="rlcCInput" class="modal-text-input" value="100" />
+              </label>
+              <button type="button" id="insertRlcToPageBtn" class="btn-primary-sm devrem-insert-btn">📄 RLC Filtre Şemasını &amp; Grafiğini Sayfaya Ekle</button>
+            </div>
+            <div class="devrem-sim-preview-card">
+              <div id="rlcPreviewDetails" class="rlc-preview-details"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- SEKME 4: DEVRE ELEMANLARI (R, C, L, OP-AMP, LOJİK) -->
+        <div id="devremSymbolsPane" class="devrem-tab-pane hidden">
+          <div class="devrem-category-bar">
+            <button type="button" class="devrem-cat-btn active" data-cat="all">Tüm Bileşenler</button>
+            <button type="button" class="devrem-cat-btn" data-cat="Pasif Elemanlar">Pasifler (R, L, C)</button>
+            <button type="button" class="devrem-cat-btn" data-cat="Yarıiletkenler">Yarıiletkenler (Diyot, BJT, LED)</button>
+            <button type="button" class="devrem-cat-btn" data-cat="Entegreler & Lojik">Op-Amp &amp; Lojik Kapılar</button>
+            <button type="button" class="devrem-cat-btn" data-cat="Kaynaklar & Toprak">Kaynaklar &amp; GND</button>
+          </div>
+          <div id="devremSymbolsGrid" class="devrem-symbols-grid"></div>
+        </div>
       </div>
+
       <div class="devrem-modal-footer">
         <div class="devrem-footer-hint">
-          <span>💡 Eklenen devre elemanını sayfada taşıyabilir ve boyutlandırabilirsiniz.</span>
+          <span>⚡ Devrem EEM Simülatörleri: Doğrudan not sayfanıza yüksek çözünürlüklü şema olarak aktarılır.</span>
         </div>
         <button type="button" id="devremCloseBtn" class="btn-secondary-sm">Kapat</button>
       </div>

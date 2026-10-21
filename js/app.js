@@ -8,6 +8,7 @@ import { PAPER_TEMPLATES, PAPER_COLORS, renderPaperBackground } from './template
 import { CanvasEngine, PAGE_WIDTH, PAGE_HEIGHT } from './canvas-engine.js';
 import { drawChart, renderChartDataUrl, compileFunction, CHART_COLORS } from './chart-builder.js';
 import { DEVREM_SYMBOLS, svgToDataUrl } from './devrem-symbols.js';
+import { KarnaughMapSimulator, TransformerSimulator, RlcSimulator } from './devrem-lab.js';
 
 const SETTINGS_KEY = 'tabnote_studio_settings_v1';
 const DEFAULT_SETTINGS = {
@@ -86,6 +87,12 @@ class TabNoteApp {
       color: CHART_COLORS[0],
       rows: []
     };
+
+    // Devrem EEM Simülatörleri
+    this.kmapSim = new KarnaughMapSimulator(3);
+    this.trSim = new TransformerSimulator();
+    this.rlcSim = new RlcSimulator();
+    this.devremActiveTab = 'kmap';
   }
 
   async init() {
@@ -145,6 +152,7 @@ class TabNoteApp {
       mainCanvas: document.getElementById('mainCanvas'),
       liveCanvas: document.getElementById('liveCanvas'),
       overlayLayer: document.getElementById('domOverlayLayer'),
+      imagesLayer: document.getElementById('domImagesLayer'),
       selectionToolbarEl: document.getElementById('lassoActionBar'),
       onChange: () => {
         this.scheduleAutoSave();
@@ -163,6 +171,13 @@ class TabNoteApp {
         }
       }
     });
+
+    // Tablet rotasyonunda ve pencere boyut değişiminde sayfayı ekrana otomatik sığdır
+    window.addEventListener('resize', () => this.fitPageToViewport());
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => this.fitPageToViewport(), 120);
+    });
+    setTimeout(() => this.fitPageToViewport(), 100);
 
     // Sonsuz Dikey Sayfa Kaydırma: Kullanıcı aşağı/yukarı kaydırdıkça görünürdeki sayfayı aktif et
     const viewportEl = document.getElementById('canvasViewport');
@@ -203,6 +218,18 @@ class TabNoteApp {
       },
       { passive: true }
     );
+  }
+
+  fitPageToViewport() {
+    const vp = document.getElementById('canvasViewport');
+    if (!vp || !this.engine) return;
+    const availWidth = vp.clientWidth - 24;
+    if (availWidth > 100 && availWidth < 920) {
+      const targetZoom = Number((availWidth / 900).toFixed(2));
+      this.engine.setZoom(targetZoom);
+    } else if (availWidth >= 920 && this.engine.zoom < 0.95) {
+      this.engine.setZoom(1.0);
+    }
   }
 
   updatePenActiveUI() {
@@ -1744,6 +1771,70 @@ class TabNoteApp {
       btn.addEventListener('click', () => this.applyChartType(btn.dataset.chartType));
     });
 
+    // Hızlı Hazır Grafik Şablonları (Tek Tıkla Veri ve Grafik Doldurma)
+    document.querySelectorAll('.chart-preset-pill').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const p = btn.dataset.preset;
+        if (p === 'sales') {
+          this.applyChartType('bar');
+          document.getElementById('chartTitleInput').value = 'Haftalık Satış & Performans';
+          this.chartState.rows = [
+            { l: 'Pazartesi', v: '18' },
+            { l: 'Salı', v: '24' },
+            { l: 'Çarşamba', v: '32' },
+            { l: 'Perşembe', v: '28' },
+            { l: 'Cuma', v: '45' }
+          ];
+        } else if (p === 'trend') {
+          this.applyChartType('line');
+          document.getElementById('chartTitleInput').value = 'Aylık Sıcaklık & Trend Eğrisi';
+          this.chartState.rows = [
+            { l: 'Ocak', v: '4' },
+            { l: 'Şubat', v: '7' },
+            { l: 'Mart', v: '14' },
+            { l: 'Nisan', v: '19' },
+            { l: 'Mayıs', v: '25' }
+          ];
+        } else if (p === 'budget') {
+          this.applyChartType('pie');
+          document.getElementById('chartTitleInput').value = 'Aylık Bütçe Dağılımı (%)';
+          this.chartState.rows = [
+            { l: 'Kira & Fatura', v: '35' },
+            { l: 'Mutfak & Gıda', v: '25' },
+            { l: 'Ulaşım', v: '15' },
+            { l: 'Eğitim & Kitap', v: '15' },
+            { l: 'Birikim', v: '10' }
+          ];
+        } else if (p === 'parabola') {
+          this.applyChartType('func');
+          document.getElementById('chartTitleInput').value = 'Parabol Eğrisi y = x²';
+          document.getElementById('chartFuncInput').value = 'x^2';
+          document.getElementById('chartXMin').value = '-5';
+          document.getElementById('chartXMax').value = '5';
+        } else if (p === 'sine') {
+          this.applyChartType('func');
+          document.getElementById('chartTitleInput').value = 'Sinüzoidal Dalga y = sin(x)';
+          document.getElementById('chartFuncInput').value = 'sin(x)';
+          document.getElementById('chartXMin').value = '-6.3';
+          document.getElementById('chartXMax').value = '6.3';
+        } else if (p === 'gauss') {
+          this.applyChartType('func');
+          document.getElementById('chartTitleInput').value = 'Gauss Normal Dağılımı';
+          document.getElementById('chartFuncInput').value = 'exp(-(x^2)/2)';
+          document.getElementById('chartXMin').value = '-4';
+          document.getElementById('chartXMax').value = '4';
+        } else if (p === 'exp') {
+          this.applyChartType('func');
+          document.getElementById('chartTitleInput').value = 'Üstel Büyüme Eğrisi';
+          document.getElementById('chartFuncInput').value = 'exp(x*0.4)';
+          document.getElementById('chartXMin').value = '-2';
+          document.getElementById('chartXMax').value = '6';
+        }
+        this.renderChartRows();
+        this.updateChartPreview();
+      });
+    });
+
     document.getElementById('chartAddRowBtn')?.addEventListener('click', () => {
       if (this.chartState.rows.length >= 12) {
         this.showToast('En fazla 12 veri satırı eklenebilir.');
@@ -1783,15 +1874,144 @@ class TabNoteApp {
   }
 
   /**
-   * DEVREM STUDIO EEM DEVRE SEMBOLLERİ
+   * DEVREM STUDIO EEM LABORATUVARI & SİMÜLATÖRLERİ
    */
   openDevremModal() {
+    this.renderKmapInteractive();
+    this.renderTransformerPreview();
+    this.renderRlcPreview();
     this.renderDevremSymbols('all');
+    this.switchDevremTab(this.devremActiveTab || 'kmap');
     document.getElementById('devremModal')?.classList.remove('hidden');
   }
 
   closeDevremModal() {
     document.getElementById('devremModal')?.classList.add('hidden');
+  }
+
+  switchDevremTab(tab) {
+    this.devremActiveTab = tab;
+    document.querySelectorAll('.devrem-tab-btn').forEach((b) => {
+      b.classList.toggle('active', b.dataset.tab === tab);
+    });
+    document.getElementById('devremKmapPane')?.classList.toggle('hidden', tab !== 'kmap');
+    document.getElementById('devremTransformerPane')?.classList.toggle('hidden', tab !== 'transformer');
+    document.getElementById('devremRlcPane')?.classList.toggle('hidden', tab !== 'rlc');
+    document.getElementById('devremSymbolsPane')?.classList.toggle('hidden', tab !== 'symbols');
+  }
+
+  renderKmapInteractive() {
+    const gridEl = document.getElementById('kmapInteractiveGrid');
+    if (!gridEl) return;
+    gridEl.innerHTML = '';
+    const sim = this.kmapSim;
+    const rows = sim.varCount === 2 ? 2 : sim.varCount === 3 ? 2 : 4;
+    const cols = sim.varCount === 2 ? 2 : 4;
+
+    let mintermMap = [];
+    if (sim.varCount === 2) mintermMap = [[0, 1], [2, 3]];
+    else if (sim.varCount === 3) mintermMap = [[0, 1, 3, 2], [4, 5, 7, 6]];
+    else mintermMap = [[0, 1, 3, 2], [4, 5, 7, 6], [12, 13, 15, 14], [8, 9, 11, 10]];
+
+    const table = document.createElement('table');
+    table.className = 'kmap-table';
+    for (let r = 0; r < rows; r++) {
+      const tr = document.createElement('tr');
+      for (let c = 0; c < cols; c++) {
+        const mIdx = mintermMap[r][c];
+        const td = document.createElement('td');
+        const val = sim.grid[mIdx];
+        td.className = `kmap-cell ${val === 1 ? 'active' : ''}`;
+        td.innerHTML = `<span class="kmap-minterm-tag">m${mIdx}</span><span class="kmap-val">${val}</span>`;
+        td.addEventListener('click', () => {
+          sim.toggleCell(mIdx);
+          this.renderKmapInteractive();
+        });
+        tr.appendChild(td);
+      }
+      table.appendChild(tr);
+    }
+    gridEl.appendChild(table);
+
+    const solution = sim.solve();
+    const exprEl = document.getElementById('kmapResultExpr');
+    if (exprEl) exprEl.textContent = solution.expr;
+    const metaEl = document.getElementById('kmapResultMinterms');
+    if (metaEl) metaEl.textContent = `Mintermler: Σm(${solution.minterms.join(', ') || '0'})`;
+  }
+
+  renderTransformerPreview() {
+    const v1 = Number(document.getElementById('trV1Input')?.value || 220);
+    const n1 = Number(document.getElementById('trN1Input')?.value || 1000);
+    const n2 = Number(document.getElementById('trN2Input')?.value || 100);
+    const rl = Number(document.getElementById('trRlInput')?.value || 10);
+    this.trSim.v1 = v1;
+    this.trSim.n1 = n1;
+    this.trSim.n2 = n2;
+    this.trSim.rl = rl;
+    const res = this.trSim.calc();
+
+    const host = document.getElementById('transformerPreviewDetails');
+    if (!host) return;
+    host.innerHTML = `
+      <div class="sim-metric-card">
+        <span class="metric-label">Dönüştürme Oranı (a):</span>
+        <strong class="metric-val">${res.a.toFixed(2)}</strong>
+      </div>
+      <div class="sim-metric-card">
+        <span class="metric-label">Sekonder Gerilimi (V₂):</span>
+        <strong class="metric-val" style="color:#2563EB">${res.v2.toFixed(1)} V (AC)</strong>
+      </div>
+      <div class="sim-metric-card">
+        <span class="metric-label">Sekonder Akımı (I₂):</span>
+        <strong class="metric-val" style="color:#2563EB">${res.i2.toFixed(2)} A</strong>
+      </div>
+      <div class="sim-metric-card">
+        <span class="metric-label">Primer Akımı (I₁):</span>
+        <strong class="metric-val" style="color:#DC2626">${res.i1.toFixed(3)} A</strong>
+      </div>
+      <div class="sim-metric-card">
+        <span class="metric-label">Çıkış Gücü (P):</span>
+        <strong class="metric-val" style="color:#059669">${res.p2.toFixed(1)} W</strong>
+      </div>
+      <div class="sim-metric-card full-span">
+        <span class="metric-badge">${res.a > 1 ? '↓ Adım Düşürücü (Step-Down)' : '↑ Adım Yükseltici (Step-Up)'}</span>
+      </div>
+    `;
+  }
+
+  renderRlcPreview() {
+    const r = Number(document.getElementById('rlcRInput')?.value || 100);
+    const l = Number(document.getElementById('rlcLInput')?.value || 10);
+    const c = Number(document.getElementById('rlcCInput')?.value || 100);
+    this.rlcSim.r = r;
+    this.rlcSim.l = l;
+    this.rlcSim.c = c;
+    const res = this.rlcSim.calc();
+
+    const host = document.getElementById('rlcPreviewDetails');
+    if (!host) return;
+    const fStr = res.f0 > 1000 ? `${(res.f0 / 1000).toFixed(2)} kHz` : `${res.f0.toFixed(1)} Hz`;
+    const bwStr = res.bw > 1000 ? `${(res.bw / 1000).toFixed(2)} kHz` : `${res.bw.toFixed(1)} Hz`;
+
+    host.innerHTML = `
+      <div class="sim-metric-card">
+        <span class="metric-label">Rezonans Frekansı (f₀):</span>
+        <strong class="metric-val" style="color:#2563EB">${fStr}</strong>
+      </div>
+      <div class="sim-metric-card">
+        <span class="metric-label">Kalite Faktörü (Q):</span>
+        <strong class="metric-val">${res.q.toFixed(2)}</strong>
+      </div>
+      <div class="sim-metric-card">
+        <span class="metric-label">Bant Genişliği (BW):</span>
+        <strong class="metric-val">${bwStr}</strong>
+      </div>
+      <div class="sim-metric-card">
+        <span class="metric-label">Açısal Hız (ω₀):</span>
+        <strong class="metric-val">${res.omega0.toFixed(0)} rad/s</strong>
+      </div>
+    `;
   }
 
   renderDevremSymbols(category = 'all') {
@@ -1842,6 +2062,56 @@ class TabNoteApp {
 
     document.getElementById('devremModal')?.addEventListener('click', (e) => {
       if (e.target.id === 'devremModal') this.closeDevremModal();
+    });
+
+    document.querySelectorAll('.devrem-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.switchDevremTab(btn.dataset.tab);
+      });
+    });
+
+    // Karnaugh Haritası Değişken Seçicisi
+    document.querySelectorAll('.devrem-var-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.devrem-var-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.kmapSim.setVarCount(Number(btn.dataset.vars));
+        this.renderKmapInteractive();
+      });
+    });
+
+    // Sayfaya Karnaugh Haritası Ekle
+    document.getElementById('insertKmapToPageBtn')?.addEventListener('click', () => {
+      const dataUrl = this.kmapSim.renderToDataUrl();
+      this.engine.addImageToPage(dataUrl, 0, 520);
+      this.closeDevremModal();
+      this.showToast('📄 Karnaugh Haritası ve çözümü sayfaya eklendi!');
+    });
+
+    // Transformatör Simülatör Girdi Dinleyicileri
+    ['trV1Input', 'trN1Input', 'trN2Input', 'trRlInput'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => this.renderTransformerPreview());
+    });
+
+    // Sayfaya Transformatör Analizini Ekle
+    document.getElementById('insertTransformerToPageBtn')?.addEventListener('click', () => {
+      const dataUrl = this.trSim.renderToDataUrl();
+      this.engine.addImageToPage(dataUrl, 0, 520);
+      this.closeDevremModal();
+      this.showToast('📄 Transformatör şeması ve analizi sayfaya eklendi!');
+    });
+
+    // RLC Simülatör Girdi Dinleyicileri
+    ['rlcRInput', 'rlcLInput', 'rlcCInput'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => this.renderRlcPreview());
+    });
+
+    // Sayfaya RLC Grafiğini Ekle
+    document.getElementById('insertRlcToPageBtn')?.addEventListener('click', () => {
+      const dataUrl = this.rlcSim.renderToDataUrl();
+      this.engine.addImageToPage(dataUrl, 0, 520);
+      this.closeDevremModal();
+      this.showToast('📄 RLC rezonans analizi ve grafiği sayfaya eklendi!');
     });
 
     document.querySelectorAll('.devrem-cat-btn').forEach((btn) => {

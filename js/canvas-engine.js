@@ -56,6 +56,7 @@ export class CanvasEngine {
     this.mainCanvas = mainCanvas;
     this.liveCanvas = liveCanvas;
     this.overlayLayer = overlayLayer;
+    this.imagesLayer = document.getElementById('domImagesLayer');
     this.selectionToolbarEl = selectionToolbarEl;
     this.onChange = onChange || (() => {});
     this.onPenStateChange = onPenStateChange || (() => {});
@@ -686,7 +687,15 @@ export class CanvasEngine {
 
     this.currentPoints = [point];
     this.scheduleAutoShapeHold();
-    this.renderLive();
+    this.liveCtx.clearRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+    // İlk dokunuş anında mürekkebi mikrosaniyede göster (sıfır gecikme hissi!)
+    this.liveCtx.save();
+    this.liveCtx.fillStyle = this.color;
+    this.liveCtx.beginPath();
+    const r = Math.max(1, (this.strokeSize * point.p) / 2);
+    this.liveCtx.arc(point.x, point.y, r, 0, Math.PI * 2);
+    this.liveCtx.fill();
+    this.liveCtx.restore();
     this.lastLivePointIndex = 1;
   }
 
@@ -1778,9 +1787,10 @@ export class CanvasEngine {
       }
     }
 
+    // Sıfır gecikme: Çizgiyi kalemin o anki fiziksel ucuna (p1) kadar anında uzat
     ctx.beginPath();
-    ctx.moveTo(prevMidX, prevMidY);
-    ctx.quadraticCurveTo(p0.x, p0.y, mx, my);
+    ctx.moveTo(p0.x, p0.y);
+    ctx.lineTo(p1.x, p1.y);
     ctx.stroke();
   }
 
@@ -1942,10 +1952,12 @@ export class CanvasEngine {
    * DOM Katmanı: Serbest Taşınabilir Ses & Not Kartları, Görseller, Dosya Kartları ve Metin Kutuları
    */
   renderDOMOverlays() {
-    if (!this.overlayLayer || !this.page) return;
-    this.overlayLayer.innerHTML = '';
+    if (!this.page) return;
+    if (this.overlayLayer) this.overlayLayer.innerHTML = '';
+    if (this.imagesLayer) this.imagesLayer.innerHTML = '';
+    const imgHost = this.imagesLayer || this.overlayLayer;
 
-    // 1. Sayfa içi serbest görseller
+    // 1. Sayfa içi serbest görseller (Görseller katmanı z-index 2 - Çizimlerin ve kalemlerin ALTINDA yer alır, üzerine çizim yapılabilir!)
     for (const imgObj of this.page.images) {
       const wrap = document.createElement('div');
       wrap.className = 'canvas-image-item';
@@ -1989,7 +2001,7 @@ export class CanvasEngine {
 
       controls.append(dragBtn, delBtn);
       wrap.append(imgEl, controls, resizeBtn);
-      this.overlayLayer.appendChild(wrap);
+      imgHost.appendChild(wrap);
     }
 
     // 2. SERBEST TAŞINABİLİR SES VE NOT KARTLARI (Sayfa Üzerinde İstediğin Yere Sürüklenebilir)
