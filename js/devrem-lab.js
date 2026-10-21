@@ -236,12 +236,9 @@ export class TransformerSimulator {
     return { a, v2, i1, i2, p1, p2 };
   }
 
-  renderToDataUrl() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 720;
-    canvas.height = 460;
+  renderToCanvas(canvas) {
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
-
     const res = this.calc();
 
     ctx.fillStyle = '#FFFFFF';
@@ -300,53 +297,98 @@ export class TransformerSimulator {
     ctx.beginPath();
     ctx.moveTo(cx + 70, cy - 50);
     ctx.lineTo(cx + 140, cy - 50);
-    ctx.lineTo(cx + 140, cy - 15);
-    ctx.strokeRect(cx + 130, cy - 15, 20, 30);
-    ctx.moveTo(cx + 140, cy + 15);
+    ctx.lineTo(cx + 140, cy - 25);
+    ctx.stroke();
+
+    // Direnç Zikzağı
+    ctx.beginPath();
+    ctx.moveTo(cx + 140, cy - 25);
+    ctx.lineTo(cx + 130, cy - 15);
+    ctx.lineTo(cx + 150, cy - 5);
+    ctx.lineTo(cx + 130, cy + 5);
+    ctx.lineTo(cx + 150, cy + 15);
+    ctx.lineTo(cx + 140, cy + 25);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(cx + 140, cy + 25);
     ctx.lineTo(cx + 140, cy + 50);
     ctx.lineTo(cx + 70, cy + 50);
     ctx.stroke();
 
     ctx.fillStyle = '#2563EB';
     ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(`V₂ = ${res.v2.toFixed(1)} V`, cx + 160, cy - 55);
-    ctx.fillText(`N₂ = ${this.n2} Sarım`, cx + 80, cy + 10);
-    ctx.fillText(`RL = ${this.rl} Ω`, cx + 160, cy + 5);
-    ctx.fillText(`I₂ = ${res.i2.toFixed(2)} A`, cx + 160, cy + 65);
+    ctx.fillText(`V₂ = ${res.v2.toFixed(1)} V`, cx + 160, cy - 60);
+    ctx.fillText(`N₂ = ${this.n2} Sarım`, cx + 85, cy + 10);
+    ctx.fillText(`R_L = ${this.rl} Ω`, cx + 160, cy);
+    ctx.fillText(`I₂ = ${res.i2.toFixed(2)} A`, cx + 160, cy + 60);
 
-    // Sağ Taraf: Analiz Tablosu & Formüller
-    const tblX = 440;
-    const tblY = 90;
+    // Sağ Taraf: Canlı Hesaplama Sonuçları Kartı
+    const cardX = 430;
+    const cardY = 85;
     ctx.fillStyle = '#F8FAFC';
-    ctx.fillRect(tblX, tblY, 250, 300);
+    ctx.fillRect(cardX, cardY, 265, 290);
     ctx.strokeStyle = '#CBD5E1';
-    ctx.strokeRect(tblX, tblY, 250, 300);
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(cardX, cardY, 265, 290);
 
     ctx.fillStyle = '#0F172A';
-    ctx.font = 'bold 15px sans-serif';
-    ctx.fillText('ANALİZ SONUÇLARI:', tblX + 16, tblY + 30);
+    ctx.font = 'bold 16px sans-serif';
+    ctx.fillText('HESAPLAMA VE ÇÖZÜM:', cardX + 16, cardY + 30);
 
-    ctx.fillStyle = '#334155';
     ctx.font = '13px sans-serif';
-    ctx.fillText(`Dönüştürme Oranı (a): ${res.a.toFixed(2)}`, tblX + 16, tblY + 65);
-    ctx.fillText(`Sekonder Gerilimi (V₂): ${res.v2.toFixed(2)} V`, tblX + 16, tblY + 100);
-    ctx.fillText(`Sekonder Akımı (I₂): ${res.i2.toFixed(2)} A`, tblX + 16, tblY + 135);
-    ctx.fillText(`Primer Akımı (I₁): ${res.i1.toFixed(3)} A`, tblX + 16, tblY + 170);
-    ctx.fillText(`Aktif Güç (P): ${res.p2.toFixed(1)} W`, tblX + 16, tblY + 205);
+    ctx.fillStyle = '#334155';
+    ctx.fillText(`Dönüştürme Oranı (a = N₁/N₂):`, cardX + 16, cardY + 65);
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillStyle = '#2563EB';
+    ctx.fillText(`a = ${res.a.toFixed(2)}`, cardX + 16, cardY + 88);
 
-    ctx.fillStyle = '#059669';
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = '#334155';
+    ctx.fillText(`Sekonder Gerilimi (V₂ = V₁/a):`, cardX + 16, cardY + 120);
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillStyle = '#2563EB';
+    ctx.fillText(`V₂ = ${res.v2.toFixed(1)} Volt (AC)`, cardX + 16, cardY + 143);
+
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = '#334155';
+    ctx.fillText(`Sekonder Akımı (I₂ = V₂/R_L):`, cardX + 16, cardY + 175);
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillStyle = '#2563EB';
+    ctx.fillText(`I₂ = ${res.i2.toFixed(2)} A`, cardX + 16, cardY + 198);
+
+    ctx.font = '13px sans-serif';
+    ctx.fillStyle = '#334155';
+    ctx.fillText(`Primer Akımı (I₁ = I₂/a):`, cardX + 16, cardY + 230);
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillStyle = '#DC2626';
+    ctx.fillText(`I₁ = ${res.i1.toFixed(3)} A`, cardX + 16, cardY + 253);
+
     ctx.font = 'bold 13px sans-serif';
-    ctx.fillText(res.a > 1 ? '↓ Adım Düşürücü (Step-Down)' : '↑ Adım Yükseltici (Step-Up)', tblX + 16, tblY + 245);
+    ctx.fillStyle = '#059669';
+    ctx.fillText(`Çıkış Gücü (P = V₂·I₂): ${res.p2.toFixed(1)} Watt`, cardX + 16, cardY + 280);
 
-    ctx.fillStyle = '#64748B';
-    ctx.font = '11px monospace';
-    ctx.fillText('V₁/V₂ = N₁/N₂ = I₂/I₁ = a', tblX + 16, tblY + 275);
+    // Tip Rozeti
+    const badgeTxt = res.a > 1 ? '↓ Adım Düşürücü (Step-Down)' : '↑ Adım Yükseltici (Step-Up)';
+    ctx.fillStyle = res.a > 1 ? '#EFF6FF' : '#FEF3C7';
+    ctx.fillRect(cardX, cardY + 300, 265, 34);
+    ctx.strokeStyle = res.a > 1 ? '#3B82F6' : '#F59E0B';
+    ctx.strokeRect(cardX, cardY + 300, 265, 34);
+    ctx.fillStyle = res.a > 1 ? '#1D4ED8' : '#B45309';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText(badgeTxt, cardX + 24, cardY + 322);
 
     // Alt Bilgi
     ctx.fillStyle = '#64748B';
     ctx.font = '12px sans-serif';
-    ctx.fillText('TabNote Studio & Devrem Laboratuvarı • EEM Transformatör Eşdeğer Devresi', 24, 435);
+    ctx.fillText('TabNote Studio & Devrem Laboratuvarı Entegrasyonu • Canlı Manyetik Devre Analizi', 24, 442);
+  }
 
+  renderToDataUrl() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 720;
+    canvas.height = 460;
+    this.renderToCanvas(canvas);
     return canvas.toDataURL('image/png');
   }
 }
@@ -371,12 +413,9 @@ export class RlcSimulator {
     return { f0, omega0, q, bw };
   }
 
-  renderToDataUrl() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 720;
-    canvas.height = 460;
+  renderToCanvas(canvas) {
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
-
     const res = this.calc();
 
     ctx.fillStyle = '#FFFFFF';
@@ -467,7 +506,13 @@ export class RlcSimulator {
     ctx.fillStyle = '#64748B';
     ctx.font = '12px sans-serif';
     ctx.fillText('TabNote Studio & Devrem Laboratuvarı • EEM RLC Band-Pass Filtre Analizi', 24, 435);
+  }
 
+  renderToDataUrl() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 720;
+    canvas.height = 460;
+    this.renderToCanvas(canvas);
     return canvas.toDataURL('image/png');
   }
 }

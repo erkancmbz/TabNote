@@ -535,8 +535,9 @@
         <div id="pageScaleWrapper" class="page-scale-wrapper">
           <div id="continuousPagesContainer" class="continuous-pages-container">
             <div class="paper-sheet-container">
-              <canvas id="mainCanvas" class="paper-canvas main-canvas"></canvas>
+              <canvas id="bgPaperCanvas" class="paper-canvas bg-paper-canvas"></canvas>
               <div id="domImagesLayer" class="dom-images-layer"></div>
+              <canvas id="mainCanvas" class="paper-canvas main-canvas"></canvas>
               <canvas id="liveCanvas" class="paper-canvas live-canvas"></canvas>
               <div id="domOverlayLayer" class="dom-overlay-layer"></div>
 
@@ -998,7 +999,7 @@
               <button type="button" id="insertTransformerToPageBtn" class="btn-primary-sm devrem-insert-btn">📄 Transformatör Şemasını &amp; Analizini Sayfaya Ekle</button>
             </div>
             <div class="devrem-sim-preview-card">
-              <div id="transformerPreviewDetails" class="transformer-preview-details"></div>
+              <canvas id="transformerLiveCanvas" width="720" height="460" class="devrem-sim-canvas"></canvas>
             </div>
           </div>
         </div>
@@ -1022,7 +1023,7 @@
               <button type="button" id="insertRlcToPageBtn" class="btn-primary-sm devrem-insert-btn">📄 RLC Filtre Şemasını &amp; Grafiğini Sayfaya Ekle</button>
             </div>
             <div class="devrem-sim-preview-card">
-              <div id="rlcPreviewDetails" class="rlc-preview-details"></div>
+              <canvas id="rlcLiveCanvas" width="720" height="460" class="devrem-sim-canvas"></canvas>
             </div>
           </div>
         </div>

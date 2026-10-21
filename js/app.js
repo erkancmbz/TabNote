@@ -149,6 +149,7 @@ class TabNoteApp {
     this.engine = new CanvasEngine({
       viewportEl: document.getElementById('canvasViewport'),
       pageWrapperEl: document.getElementById('pageScaleWrapper'),
+      bgPaperCanvas: document.getElementById('bgPaperCanvas'),
       mainCanvas: document.getElementById('mainCanvas'),
       liveCanvas: document.getElementById('liveCanvas'),
       overlayLayer: document.getElementById('domOverlayLayer'),
@@ -173,11 +174,19 @@ class TabNoteApp {
     });
 
     // Tablet rotasyonunda ve pencere boyut değişiminde sayfayı ekrana otomatik sığdır
-    window.addEventListener('resize', () => this.fitPageToViewport());
+    window.fitPageToViewport = () => this.fitPageToViewport();
+    window.addEventListener('resize', () => {
+      this.fitPageToViewport();
+      setTimeout(() => this.fitPageToViewport(), 150);
+      setTimeout(() => this.fitPageToViewport(), 350);
+    });
     window.addEventListener('orientationchange', () => {
-      setTimeout(() => this.fitPageToViewport(), 120);
+      this.fitPageToViewport();
+      setTimeout(() => this.fitPageToViewport(), 150);
+      setTimeout(() => this.fitPageToViewport(), 350);
     });
     setTimeout(() => this.fitPageToViewport(), 100);
+    setTimeout(() => this.fitPageToViewport(), 300);
 
     // Sonsuz Dikey Sayfa Kaydırma: Kullanıcı aşağı/yukarı kaydırdıkça görünürdeki sayfayı aktif et
     const viewportEl = document.getElementById('canvasViewport');
@@ -223,13 +232,21 @@ class TabNoteApp {
   fitPageToViewport() {
     const vp = document.getElementById('canvasViewport');
     if (!vp || !this.engine) return;
-    const availWidth = vp.clientWidth - 24;
-    if (availWidth > 100 && availWidth < 920) {
-      const targetZoom = Number((availWidth / 900).toFixed(2));
+
+    const isPortrait = window.innerHeight > window.innerWidth;
+    const appShell = document.getElementById('appShell');
+    if (isPortrait && appShell && !appShell.classList.contains('sidebar-collapsed')) {
+      appShell.classList.add('sidebar-collapsed');
+    }
+
+    const availWidth = Math.max(200, (vp.clientWidth || window.innerWidth) - 24);
+    if (availWidth < 900) {
+      const targetZoom = Math.max(0.4, Number((availWidth / 900).toFixed(2)));
       this.engine.setZoom(targetZoom);
-    } else if (availWidth >= 920 && this.engine.zoom < 0.95) {
+    } else if (this.engine.zoom < 0.98) {
       this.engine.setZoom(1.0);
     }
+    vp.scrollLeft = 0;
   }
 
   updatePenActiveUI() {
@@ -1949,35 +1966,11 @@ class TabNoteApp {
     this.trSim.n1 = n1;
     this.trSim.n2 = n2;
     this.trSim.rl = rl;
-    const res = this.trSim.calc();
 
-    const host = document.getElementById('transformerPreviewDetails');
-    if (!host) return;
-    host.innerHTML = `
-      <div class="sim-metric-card">
-        <span class="metric-label">Dönüştürme Oranı (a):</span>
-        <strong class="metric-val">${res.a.toFixed(2)}</strong>
-      </div>
-      <div class="sim-metric-card">
-        <span class="metric-label">Sekonder Gerilimi (V₂):</span>
-        <strong class="metric-val" style="color:#2563EB">${res.v2.toFixed(1)} V (AC)</strong>
-      </div>
-      <div class="sim-metric-card">
-        <span class="metric-label">Sekonder Akımı (I₂):</span>
-        <strong class="metric-val" style="color:#2563EB">${res.i2.toFixed(2)} A</strong>
-      </div>
-      <div class="sim-metric-card">
-        <span class="metric-label">Primer Akımı (I₁):</span>
-        <strong class="metric-val" style="color:#DC2626">${res.i1.toFixed(3)} A</strong>
-      </div>
-      <div class="sim-metric-card">
-        <span class="metric-label">Çıkış Gücü (P):</span>
-        <strong class="metric-val" style="color:#059669">${res.p2.toFixed(1)} W</strong>
-      </div>
-      <div class="sim-metric-card full-span">
-        <span class="metric-badge">${res.a > 1 ? '↓ Adım Düşürücü (Step-Down)' : '↑ Adım Yükseltici (Step-Up)'}</span>
-      </div>
-    `;
+    const liveCv = document.getElementById('transformerLiveCanvas');
+    if (liveCv) {
+      this.trSim.renderToCanvas(liveCv);
+    }
   }
 
   renderRlcPreview() {
@@ -1987,31 +1980,11 @@ class TabNoteApp {
     this.rlcSim.r = r;
     this.rlcSim.l = l;
     this.rlcSim.c = c;
-    const res = this.rlcSim.calc();
 
-    const host = document.getElementById('rlcPreviewDetails');
-    if (!host) return;
-    const fStr = res.f0 > 1000 ? `${(res.f0 / 1000).toFixed(2)} kHz` : `${res.f0.toFixed(1)} Hz`;
-    const bwStr = res.bw > 1000 ? `${(res.bw / 1000).toFixed(2)} kHz` : `${res.bw.toFixed(1)} Hz`;
-
-    host.innerHTML = `
-      <div class="sim-metric-card">
-        <span class="metric-label">Rezonans Frekansı (f₀):</span>
-        <strong class="metric-val" style="color:#2563EB">${fStr}</strong>
-      </div>
-      <div class="sim-metric-card">
-        <span class="metric-label">Kalite Faktörü (Q):</span>
-        <strong class="metric-val">${res.q.toFixed(2)}</strong>
-      </div>
-      <div class="sim-metric-card">
-        <span class="metric-label">Bant Genişliği (BW):</span>
-        <strong class="metric-val">${bwStr}</strong>
-      </div>
-      <div class="sim-metric-card">
-        <span class="metric-label">Açısal Hız (ω₀):</span>
-        <strong class="metric-val">${res.omega0.toFixed(0)} rad/s</strong>
-      </div>
-    `;
+    const liveCv = document.getElementById('rlcLiveCanvas');
+    if (liveCv) {
+      this.rlcSim.renderToCanvas(liveCv);
+    }
   }
 
   renderDevremSymbols(category = 'all') {

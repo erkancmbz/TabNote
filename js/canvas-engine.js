@@ -40,9 +40,11 @@ export class CanvasEngine {
   constructor({
     viewportEl,
     pageWrapperEl,
+    bgPaperCanvas,
     mainCanvas,
     liveCanvas,
     overlayLayer,
+    imagesLayer,
     selectionToolbarEl,
     onChange,
     onPenStateChange,
@@ -53,10 +55,11 @@ export class CanvasEngine {
   }) {
     this.viewportEl = viewportEl;
     this.pageWrapperEl = pageWrapperEl;
+    this.bgPaperCanvas = bgPaperCanvas || document.getElementById('bgPaperCanvas');
     this.mainCanvas = mainCanvas;
     this.liveCanvas = liveCanvas;
     this.overlayLayer = overlayLayer;
-    this.imagesLayer = document.getElementById('domImagesLayer');
+    this.imagesLayer = imagesLayer || document.getElementById('domImagesLayer');
     this.selectionToolbarEl = selectionToolbarEl;
     this.onChange = onChange || (() => {});
     this.onPenStateChange = onPenStateChange || (() => {});
@@ -71,6 +74,9 @@ export class CanvasEngine {
     this.activeRecordingTargetX = 94;
     this.activeRecordingTimeText = '00:00';
 
+    if (this.bgPaperCanvas) {
+      this.bgPaperCtx = this.bgPaperCanvas.getContext('2d');
+    }
     this.mainCtx = this.mainCanvas.getContext('2d');
     // desynchronized: kalem çizgisini ekrana tarayıcı kompozisyonunu beklemeden gönderir (düşük gecikme)
     this.liveCtx = this.liveCanvas.getContext('2d', { desynchronized: true });
@@ -165,13 +171,19 @@ export class CanvasEngine {
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     this.dpr = dpr;
 
-    [this.mainCanvas, this.liveCanvas].forEach((canvas) => {
+    const canvases = [this.mainCanvas, this.liveCanvas];
+    if (this.bgPaperCanvas) canvases.push(this.bgPaperCanvas);
+
+    canvases.forEach((canvas) => {
       canvas.width = PAGE_WIDTH * dpr;
       canvas.height = PAGE_HEIGHT * dpr;
       canvas.style.width = `${PAGE_WIDTH}px`;
       canvas.style.height = `${PAGE_HEIGHT}px`;
     });
 
+    if (this.bgPaperCtx) {
+      this.bgPaperCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
     this.mainCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
     this.liveCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
@@ -1532,7 +1544,14 @@ export class CanvasEngine {
     const pColor = this.page.paperColor || 'ivory';
     const cacheKey = `${this.page.id}_${tpl}_${pColor}_${bgImg ? 'img' : 'noimg'}`;
 
-    if (this.paperBgCanvas && this.paperBgCtx) {
+    if (this.bgPaperCtx) {
+      // Bağımsız Kağıt Arka Plan Katmanı: Fotoğrafların ALTINDA kalır, kalem çizgileri ise ÜSTÜNDEDİR
+      if (this.paperBgCacheKey !== cacheKey) {
+        this.bgPaperCtx.clearRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+        renderPaperBackground(this.bgPaperCtx, PAGE_WIDTH, PAGE_HEIGHT, tpl, pColor, bgImg);
+        this.paperBgCacheKey = cacheKey;
+      }
+    } else if (this.paperBgCanvas && this.paperBgCtx) {
       if (this.paperBgCacheKey !== cacheKey) {
         this.paperBgCtx.clearRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
         renderPaperBackground(this.paperBgCtx, PAGE_WIDTH, PAGE_HEIGHT, tpl, pColor, bgImg);

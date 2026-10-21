@@ -107,8 +107,8 @@ fs.writeFileSync(path.join(resDrawableDir, 'ic_launcher.xml'), icLauncherXml, 'u
 const manifestXml = `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.tabnote.studio"
-    android:versionCode="7"
-    android:versionName="1.6.0">
+    android:versionCode="8"
+    android:versionName="1.7.0">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.INTERNET" />
@@ -149,6 +149,7 @@ import android.app.Activity;
 import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Build;
@@ -314,6 +315,20 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    public void onConfigurationChanged(Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        if (webView != null) {
+            webView.post(new Runnable() {
+                @Override
+                public void run() {
+                    applyImmersiveMode();
+                    webView.evaluateJavascript("if(window.fitPageToViewport) window.fitPageToViewport();", null);
+                }
+            });
+        }
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -321,33 +336,32 @@ public class MainActivity extends Activity {
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN
         );
-        applyImmersiveMode();
-        getWindow().getDecorView().setOnSystemUiVisibilityChangeListener(new View.OnSystemUiVisibilityChangeListener() {
-            @Override
-            public void onSystemUiVisibilityChange(int visibility) {
-                if ((visibility & View.SYSTEM_UI_FLAG_FULLSCREEN) == 0) {
-                    applyImmersiveMode();
-                }
-            }
-        });
 
         webView = new WebView(this);
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
-        settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(true);
         settings.setAllowContentAccess(true);
         settings.setAllowFileAccessFromFileURLs(true);
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setLoadWithOverviewMode(false);
-        settings.setUseWideViewPort(false);
+        settings.setLoadWithOverviewMode(true);
+        settings.setUseWideViewPort(true);
         settings.setBuiltInZoomControls(false);
         settings.setDisplayZoomControls(false);
 
         webView.addJavascriptInterface(new AndroidVoiceBridge(), "AndroidVoiceBridge");
         webView.setWebViewClient(new WebViewClient());
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
+        setContentView(webView);
+
+        webView.post(new Runnable() {
+            @Override
+            public void run() {
+                applyImmersiveMode();
+            }
+        });
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
@@ -404,8 +418,6 @@ public class MainActivity extends Activity {
             }
         });
 
-        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-        setContentView(webView);
         webView.loadUrl("file:///android_asset/index.html");
     }
 

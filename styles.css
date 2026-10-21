@@ -1140,14 +1140,20 @@ button {
   height: 1240px;
 }
 
-.main-canvas {
+.bg-paper-canvas {
   z-index: 1;
+  pointer-events: none;
 }
 
 .dom-images-layer {
   position: absolute;
   inset: 0;
   z-index: 2;
+  pointer-events: none;
+}
+
+.main-canvas {
+  z-index: 4;
   pointer-events: none;
 }
 
@@ -3881,7 +3887,8 @@ button {
   overflow-x: auto;
 }
 
-.devrem-tab-pill {
+.devrem-tab-pill,
+.devrem-tab-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -3894,14 +3901,17 @@ button {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.18s ease;
+  white-space: nowrap;
 }
 
-.devrem-tab-pill:hover {
+.devrem-tab-pill:hover,
+.devrem-tab-btn:hover {
   background: var(--bg-chrome-elevated);
   color: var(--text-primary);
 }
 
-.devrem-tab-pill.active {
+.devrem-tab-pill.active,
+.devrem-tab-btn.active {
   background: rgba(59, 130, 246, 0.16);
   border-color: rgba(59, 130, 246, 0.4);
   color: #60A5FA;
@@ -3909,28 +3919,71 @@ button {
 
 /* Devrem Sekme İçerikleri & Sim Grid */
 .devrem-tab-pane {
-  display: none;
+  display: block;
   flex: 1;
   min-height: 0;
   overflow: auto;
   padding: 16px;
 }
 
-.devrem-tab-pane.active {
-  display: block;
+.devrem-tab-pane.hidden {
+  display: none !important;
 }
 
 .devrem-sim-grid {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 280px 1fr;
   gap: 16px;
-  height: 100%;
+  align-items: start;
 }
 
 @media (max-width: 900px) {
   .devrem-sim-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.devrem-sim-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--bg-desk);
+  border: 1px solid var(--border-hairline);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.devrem-ctrl-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.devrem-ctrl-row span {
+  font-weight: 600;
+}
+
+.devrem-sim-preview-card {
+  background: #0F172A;
+  border: 1px solid var(--border-hairline);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+.devrem-sim-canvas {
+  width: 100%;
+  max-width: 720px;
+  height: auto;
+  aspect-ratio: 720 / 460;
+  display: block;
+  border-radius: 6px;
+  background: #FFFFFF;
 }
 
 .devrem-canvas-card {
@@ -3989,30 +4042,25 @@ button {
 /* Karnaugh Haritası Hücreleri */
 .kmap-table {
   border-collapse: separate;
-  border-spacing: 4px;
+  border-spacing: 6px;
   margin: 12px auto;
 }
 
-.kmap-table th {
-  padding: 6px 12px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-align: center;
-}
-
 .kmap-cell {
-  width: 44px;
-  height: 44px;
+  width: 52px;
+  height: 52px;
   background: var(--bg-chrome-elevated);
   border: 1.5px solid var(--border-hairline);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 800;
   cursor: pointer;
   transition: all 0.14s ease;
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .kmap-cell:hover {
@@ -4020,25 +4068,81 @@ button {
   transform: scale(1.05);
 }
 
+.kmap-cell.active,
 .kmap-cell.one {
-  background: rgba(16, 185, 129, 0.18);
-  border-color: #10B981;
-  color: #34D399;
+  background: rgba(16, 185, 129, 0.22) !important;
+  border-color: #10B981 !important;
+  color: #34D399 !important;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
 }
 
-.kmap-cell.dc {
-  background: rgba(245, 158, 11, 0.18);
-  border-color: #F59E0B;
-  color: #FBBF24;
-}
-
-.kmap-cell .cell-minterm {
+.kmap-minterm-tag {
   position: absolute;
   top: 2px;
   left: 4px;
   font-size: 9px;
   color: var(--text-muted);
-  font-weight: normal;
+  font-weight: 500;
+}
+
+.kmap-val {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.devrem-var-selector {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.devrem-var-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: var(--bg-chrome-elevated);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.devrem-var-btn.active {
+  background: #2563EB;
+  border-color: #3B82F6;
+  color: #FFFFFF;
+}
+
+.kmap-interactive-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.kmap-result-box {
+  width: 100%;
+  max-width: 520px;
+  background: var(--bg-desk);
+  border: 1px solid var(--border-hairline);
+  border-radius: 10px;
+  padding: 16px;
+  text-align: center;
+}
+
+.kmap-res-expr {
+  font-size: 20px;
+  font-weight: 800;
+  color: #60A5FA;
+  margin: 8px 0;
+  font-family: monospace;
+}
+
+.kmap-res-meta {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
 }
 
 /* Sonuç Kartı */
