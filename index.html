@@ -40,6 +40,10 @@
       </div>
 
       <div class="home-top-actions">
+        <button type="button" id="homeSettingsBtn" class="home-btn-secondary" title="Ayarlar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg>
+          <span>Ayarlar</span>
+        </button>
         <button type="button" id="homeNewFolderBtn" class="home-btn-secondary">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
@@ -103,6 +107,10 @@
 
       <!-- Yeni Not Defteri Ana Aksiyon -->
       <div class="sidebar-primary-cta">
+        <button type="button" id="backToHomeBtn" class="sidebar-home-btn" title="Ana Ekrana (klasörler ve not defterleri) dön">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5" /><path d="M5 10v10h5v-6h4v6h5V10" /></svg>
+          <span>Ana Ekran</span>
+        </button>
         <button type="button" id="newNotebookBtn" class="btn-new-notebook">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
             <path d="M12 5v14M5 12h14" stroke-linecap="round" />
@@ -147,6 +155,13 @@
         </div>
         <div id="pageThumbnailsGrid" class="page-thumbnails-grid"></div>
       </div>
+      <div class="sidebar-footer">
+        <button type="button" id="sidebarSettingsBtn" class="sidebar-settings-btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg>
+          <span>Ayarlar</span>
+        </button>
+        <span class="sidebar-copyright">© 2026 Erkan Cambaz</span>
+      </div>
     </aside>
 
     <!-- ANA ÇALIŞMA ALANI (STÜDYO) -->
@@ -154,12 +169,6 @@
       <!-- ÜST STÜDYO ÇUBUĞU -->
       <header class="studio-topbar">
         <div class="topbar-left">
-          <button type="button" id="backToHomeBtn" class="back-home-btn" title="Ana Ekrana (Klasörler ve Not Defterleri) Dön">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
-              <path d="M15 18l-6-6 6-6" stroke-linecap="round" stroke-linejoin="round" />
-            </svg>
-            <span>Ana Ekran</span>
-          </button>
 
           <button type="button" id="toggleSidebarBtn" class="icon-btn" title="Kenar Çubuğunu Aç/Kapat">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -253,58 +262,117 @@
         </div>
       </header>
 
-      <!-- SAMSUNG NOTES TARZI KALEM VE MÜREKKEP İSTASYONU (STYLUS DOCK) -->
+      <!-- KALEM VE MÜREKKEP İSTASYONU (aç/kapa çentikli) -->
+      <div id="dockWrap" class="dock-wrap">
       <section class="stylus-dock-bar" aria-label="Kalem ve Çizim Araçları">
-        <!-- Kalem Uçları ve Araç Gereçler (Physical Pen Nibs & Tools) -->
         <div class="pen-instruments-rack">
-          <button type="button" class="tool-dock-btn active" data-tool="fountain" title="Dolma Kalem (Basınç Hassasiyetli Kaligrafik Uç)">
-            <svg class="pen-nib-svg" viewBox="0 0 36 48">
-              <path d="M18 4 L27 22 L24 44 L12 44 L9 22 Z" fill="#CBD5E1" stroke="#475569" stroke-width="1.5" />
-              <path class="dynamic-ink-nib" d="M14 44 L22 44 L24 28 L18 14 L12 28 Z" fill="#1E293B" />
-              <line x1="18" y1="5" x2="18" y2="21" stroke="#1E293B" stroke-width="1.5" />
-              <circle cx="18" cy="21" r="2" fill="#1E293B" />
+          <button type="button" class="tool-dock-btn active" data-tool="fountain" title="Dolma Kalem (basınca duyarlı)">
+            <svg class="pen-nib-svg" viewBox="0 0 24 48">
+              <path d="M12 2 L17 15 Q17 19 15.5 20 H8.5 Q7 19 7 15 Z" fill="#E2E8F0" stroke="#64748B" stroke-width="1.2" stroke-linejoin="round" />
+              <path d="M12 7 V15" stroke="#64748B" stroke-width="1" />
+              <circle cx="12" cy="16" r="1.1" fill="#64748B" />
+              <rect x="7.5" y="20" width="9" height="3.5" rx="1" fill="#C9A24B" />
+              <rect x="7.5" y="23.5" width="9" height="21" rx="3" fill="#1E293B" />
+              <rect class="dynamic-ink-nib" x="7.5" y="27" width="9" height="3" />
             </svg>
             <span class="tool-label">Dolma</span>
           </button>
 
-          <button type="button" class="tool-dock-btn" data-tool="ballpoint" title="Tükenmez Kalem (Dengeli Günlük El Yazısı)">
-            <svg class="pen-nib-svg" viewBox="0 0 36 48">
-              <path d="M15 8 C15 5, 21 5, 21 8 L24 26 L23 44 L13 44 L12 26 Z" fill="#E2E8F0" stroke="#475569" stroke-width="1.5" />
-              <path class="dynamic-ink-nib" d="M13 30 L23 30 L23 44 L13 44 Z" fill="#1E293B" />
-              <circle class="dynamic-ink-nib" cx="18" cy="6" r="2.5" fill="#1E293B" />
+          <button type="button" class="tool-dock-btn" data-tool="ballpoint" title="Tükenmez Kalem">
+            <svg class="pen-nib-svg" viewBox="0 0 24 48">
+              <path d="M10.5 9 L12 2.5 L13.5 9 Z" fill="#CBD5E1" stroke="#64748B" stroke-width="1" stroke-linejoin="round" />
+              <rect x="8" y="9" width="8" height="5" rx="1" fill="#94A3B8" />
+              <rect x="8" y="14" width="8" height="26" rx="2" fill="#F1F5F9" stroke="#94A3B8" stroke-width="1" />
+              <rect class="dynamic-ink-nib" x="8" y="18" width="8" height="3" />
+              <rect x="10.5" y="40" width="3" height="6" rx="1.2" fill="#64748B" />
             </svg>
             <span class="tool-label">Tükenmez</span>
           </button>
 
-          <button type="button" class="tool-dock-btn" data-tool="pencil" title="Kurşun Kalem (Eskiz ve Gölgelendirme)">
-            <svg class="pen-nib-svg" viewBox="0 0 36 48">
-              <polygon points="18,4 25,20 25,44 11,44 11,20" fill="#FDE68A" stroke="#92400E" stroke-width="1.5" />
-              <polygon class="dynamic-ink-nib" points="18,4 22,13 14,13" fill="#1E293B" />
-              <rect x="11" y="34" width="14" height="10" fill="#F59E0B" />
+          <button type="button" class="tool-dock-btn" data-tool="fineliner" title="İnce Uçlu Kalem (sabit ince çizgi)">
+            <svg class="pen-nib-svg" viewBox="0 0 24 48">
+              <path d="M11 2 H13 L13.6 9 H10.4 Z" fill="#CBD5E1" stroke="#64748B" stroke-width="1" stroke-linejoin="round" />
+              <rect class="dynamic-ink-nib" x="8.5" y="9" width="7" height="6" rx="1" />
+              <rect x="8.5" y="15" width="7" height="30" rx="3.5" fill="#334155" />
+              <rect x="10" y="22" width="1.4" height="14" rx="0.7" fill="#64748B" />
+            </svg>
+            <span class="tool-label">İnce Uç</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="pencil" title="Kurşun Kalem (eskiz ve gölgelendirme)">
+            <svg class="pen-nib-svg" viewBox="0 0 24 48">
+              <path d="M12 2 L16 12 H8 Z" fill="#F3D9A4" />
+              <path class="dynamic-ink-nib" d="M12 2 L13.4 5.6 H10.6 Z" />
+              <rect x="8" y="12" width="8" height="27" fill="#F59E0B" />
+              <rect x="10.2" y="12" width="1.2" height="27" fill="#D97706" />
+              <rect x="8" y="39" width="8" height="3" fill="#94A3B8" />
+              <rect x="8" y="42" width="8" height="4" rx="1.4" fill="#FDA4AF" />
             </svg>
             <span class="tool-label">Kurşun</span>
           </button>
 
-          <button type="button" class="tool-dock-btn" data-tool="highlighter" title="Fosforlu Kalem (Metin Vurgulama)">
-            <svg class="pen-nib-svg" viewBox="0 0 36 48">
-              <polygon class="dynamic-ink-nib" points="12,10 25,5 25,20 11,20" fill="#FACC15" opacity="0.88" />
-              <rect x="9" y="20" width="18" height="24" rx="2" fill="#334155" stroke="#64748B" stroke-width="1.5" />
-              <rect class="dynamic-ink-nib" x="11" y="28" width="14" height="8" rx="1" fill="#FACC15" />
+          <button type="button" class="tool-dock-btn" data-tool="brush" title="Fırça Kalem (basınca göre ince-kalın)">
+            <svg class="pen-nib-svg" viewBox="0 0 24 48">
+              <path class="dynamic-ink-nib" d="M12 1.5 Q17 8 15.5 16 H8.5 Q7 8 12 1.5 Z" />
+              <rect x="8" y="16" width="8" height="7" fill="#CBD5E1" stroke="#64748B" stroke-width="1" />
+              <path d="M9.2 23 H14.8 L13.4 46 H10.6 Z" fill="#92400E" />
+            </svg>
+            <span class="tool-label">Fırça</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="calligraphy" title="Kaligrafi Kalemi (45° kesik uç)">
+            <svg class="pen-nib-svg" viewBox="0 0 24 48">
+              <path d="M7.5 9 L15.5 2 L17 4.5 L13.5 15 H8.5 Z" fill="#E2E8F0" stroke="#64748B" stroke-width="1.1" stroke-linejoin="round" />
+              <path d="M9.4 10 L14 5" stroke="#64748B" stroke-width="1" />
+              <rect x="8" y="15" width="8" height="3" fill="#C9A24B" />
+              <rect x="8" y="18" width="8" height="27" rx="3" fill="#7C2D12" />
+              <rect class="dynamic-ink-nib" x="8" y="22" width="8" height="3" />
+            </svg>
+            <span class="tool-label">Kaligrafi</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="marker" title="Keçeli Kalem (kalın, düz çizgi)">
+            <svg class="pen-nib-svg" viewBox="0 0 24 48">
+              <path class="dynamic-ink-nib" d="M8.5 13 Q8.5 3 12 3 Q15.5 3 15.5 13 Z" />
+              <rect x="7" y="13" width="10" height="5" fill="#475569" />
+              <rect x="7" y="18" width="10" height="27" rx="2.5" fill="#E2E8F0" stroke="#94A3B8" stroke-width="1" />
+              <rect class="dynamic-ink-nib" x="7" y="26" width="10" height="9" />
+            </svg>
+            <span class="tool-label">Keçeli</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="crayon" title="Pastel Boya (dokulu çizgi)">
+            <svg class="pen-nib-svg" viewBox="0 0 24 48">
+              <path class="dynamic-ink-nib" d="M8 11 L10.5 3 H13.5 L16 11 Z" />
+              <rect class="dynamic-ink-nib" x="8" y="11" width="8" height="9" />
+              <rect x="8" y="20" width="8" height="25" rx="1.5" fill="#F1F5F9" stroke="#94A3B8" stroke-width="1" />
+              <rect class="dynamic-ink-nib" x="8" y="25" width="8" height="2.5" />
+              <rect class="dynamic-ink-nib" x="8" y="37" width="8" height="2.5" />
+            </svg>
+            <span class="tool-label">Pastel</span>
+          </button>
+
+          <button type="button" class="tool-dock-btn" data-tool="highlighter" title="Fosforlu Kalem (metin vurgulama)">
+            <svg class="pen-nib-svg" viewBox="0 0 24 48">
+              <path class="dynamic-ink-nib" d="M8 11 L10 3 H15.5 L16 11 Z" opacity="0.9" />
+              <rect x="7" y="11" width="10" height="5" fill="#475569" />
+              <rect x="7" y="16" width="10" height="29" rx="2.5" fill="#64748B" />
+              <rect class="dynamic-ink-nib" x="7" y="24" width="10" height="6" />
             </svg>
             <span class="tool-label">Fosforlu</span>
           </button>
 
           <span class="dock-sep"></span>
 
-          <button type="button" class="tool-dock-btn" data-tool="eraser" title="Silgi (Çizgi Silgisi veya Bölgesel Silgi)">
-            <svg class="pen-nib-svg" viewBox="0 0 36 48">
-              <rect x="10" y="8" width="16" height="20" rx="4" fill="#FDA4AF" stroke="#E11D48" stroke-width="1.5" />
-              <rect x="9" y="24" width="18" height="20" rx="2" fill="#E2E8F0" stroke="#475569" stroke-width="1.5" />
+          <button type="button" class="tool-dock-btn" data-tool="eraser" title="Silgi (çizgi silgisi veya bölgesel silgi)">
+            <svg class="pen-nib-svg" viewBox="0 0 24 48">
+              <rect x="6.5" y="6" width="11" height="22" rx="3" fill="#FDA4AF" stroke="#E11D48" stroke-width="1.2" />
+              <rect x="6.5" y="28" width="11" height="16" rx="2" fill="#E2E8F0" stroke="#64748B" stroke-width="1.2" />
             </svg>
             <span class="tool-label">Silgi</span>
           </button>
 
-          <button type="button" class="tool-dock-btn" data-tool="shape" title="Geometrik Şekiller (Çizgi, Ok, Dikdörtgen, Daire, Üçgen)">
+          <button type="button" class="tool-dock-btn" data-tool="shape" title="Geometrik Şekiller">
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="3" y="3" width="11" height="11" rx="2" />
               <circle cx="15.5" cy="15.5" r="5.5" />
@@ -312,7 +380,7 @@
             <span class="tool-label">Şekiller</span>
           </button>
 
-          <button type="button" class="tool-dock-btn" data-tool="lasso" title="Kement Seçimi (Çizimleri Seç, Taşı, Boyutlandır veya Kopyala)">
+          <button type="button" class="tool-dock-btn" data-tool="lasso" title="Kement Seçimi (seç, taşı, boyutlandır, kopyala)">
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2">
               <path d="M7 22a5 5 0 0 1-2-4" />
               <path d="M3.3 14A6.8 6.8 0 0 1 2 10c0-4.4 4.5-8 10-8s10 3.6 10 8-4.5 8-10 8a12 12 0 0 1-5-1" />
@@ -321,7 +389,7 @@
             <span class="tool-label">Kement</span>
           </button>
 
-          <button type="button" class="tool-dock-btn" data-tool="text" title="Metin Kutusu Ekle (Sayfada İstediğin Yere Tıkla ve Yaz)">
+          <button type="button" class="tool-dock-btn" data-tool="text" title="Metin Kutusu Ekle">
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <polyline points="4 7 4 4 20 4 20 7" />
               <line x1="9" y1="20" x2="15" y2="20" />
@@ -330,17 +398,28 @@
             <span class="tool-label">Metin</span>
           </button>
 
-          <!-- MİKROFON, SES VE NOT KAYDET AÇILIŞ EKRANI BUTONU (ARAÇ GEREÇLER İÇERİSİNDE) -->
-          <button type="button" id="openVoiceStudioModalBtn" class="tool-dock-btn voice-dock-trigger" title="Mikrofon, Ses ve Not Kaydet (Sesinizi ve notunuzu kaydedip sayfaya taşınabilir kart olarak düşürün)">
+          <!-- GRAFİK EKLE -->
+          <button type="button" id="openChartModalBtn" class="tool-dock-btn" title="Grafik Ekle (çubuk, çizgi, pasta, fonksiyon)">
+            <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 3v18h18" />
+              <rect x="7" y="12" width="3" height="6" />
+              <rect x="12" y="8" width="3" height="10" />
+              <rect x="17" y="5" width="3" height="13" />
+            </svg>
+            <span class="tool-label">Grafik</span>
+          </button>
+
+          <!-- MİKROFON, SES VE NOT KAYDET -->
+          <button type="button" id="openVoiceStudioModalBtn" class="tool-dock-btn voice-dock-trigger" title="Mikrofon, Ses ve Not Kaydet">
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.2">
               <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
               <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
               <line x1="12" y1="19" x2="12" y2="22" />
             </svg>
-            <span class="tool-label">Ses & Not</span>
+            <span class="tool-label">Ses &amp; Not</span>
           </button>
 
-          <button type="button" class="tool-dock-btn" data-tool="laser" title="Lazer İşaretçi (Sunum ve Çalışma İçin Kaybolan Lazer İzi)">
+          <button type="button" class="tool-dock-btn" data-tool="laser" title="Lazer İşaretçi">
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.2">
               <circle cx="12" cy="12" r="4" fill="#EF4444" />
               <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1" />
@@ -348,7 +427,7 @@
             <span class="tool-label">Lazer</span>
           </button>
 
-          <button type="button" class="tool-dock-btn" data-tool="pan" title="Sayfayı Kaydır (El Aracı - Parmakla veya Kalemle Sayfayı Kaydır)">
+          <button type="button" class="tool-dock-btn" data-tool="pan" title="Sayfayı Kaydır (El Aracı)">
             <svg class="tool-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
               <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
@@ -407,6 +486,12 @@
           </div>
         </div>
       </section>
+
+      <!-- Küçük çentik: kalem araçlarını açıp kapatır -->
+      <button type="button" id="dockToggleBtn" class="dock-notch" title="Kalem araçlarını aç / kapat" aria-expanded="true">
+        <svg width="18" height="10" viewBox="0 0 18 10" aria-hidden="true"><path d="M2 8 L9 2 L16 8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </button>
+      </div>
 
       <!-- SİLGİ ALT PANELİ (Silgi seçildiğinde açılır) -->
       <div id="eraserSubPanel" class="sub-tool-bar hidden">
@@ -533,6 +618,125 @@
             ✓ Kaydet ve Sayfaya Düşür
           </button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GRAFİK EKLE -->
+  <div id="chartModal" class="modal-backdrop hidden">
+    <div class="modal-dialog modal-lg chart-dialog">
+      <div class="modal-header">
+        <div>
+          <h3>📊 Grafik Ekle</h3>
+          <p class="modal-sub">Grafik türünü seçin, verilerinizi girin; grafik sayfaya taşınabilir ve boyutlandırılabilir görsel olarak eklenir.</p>
+        </div>
+        <button type="button" id="closeChartModalBtn" class="icon-btn">✕</button>
+      </div>
+      <div class="modal-body chart-body">
+        <div class="chart-form">
+          <h4 class="modal-section-label">Grafik Türü</h4>
+          <div class="chart-type-row" id="chartTypeRow">
+            <button type="button" class="chart-type-btn active" data-chart-type="bar">📊 Çubuk</button>
+            <button type="button" class="chart-type-btn" data-chart-type="line">📈 Çizgi</button>
+            <button type="button" class="chart-type-btn" data-chart-type="pie">🥧 Pasta</button>
+            <button type="button" class="chart-type-btn" data-chart-type="func">ƒ Fonksiyon</button>
+          </div>
+
+          <h4 class="modal-section-label">Başlık</h4>
+          <input type="text" id="chartTitleInput" class="modal-text-input" placeholder="Örn: Aylık Satışlar" value="Aylık Satışlar" />
+
+          <div id="chartDataPanel">
+            <h4 class="modal-section-label">Veriler</h4>
+            <div id="chartDataRows" class="chart-data-rows"></div>
+            <button type="button" id="chartAddRowBtn" class="btn-secondary-sm">+ Satır Ekle</button>
+          </div>
+
+          <div id="chartFuncPanel" class="hidden">
+            <h4 class="modal-section-label">Fonksiyon  y = f(x)</h4>
+            <input type="text" id="chartFuncInput" class="modal-text-input" value="sin(x)" placeholder="Örn: x^2, sin(x), sqrt(x), 2*x+1" />
+            <div class="chart-func-range">
+              <label>x min <input type="number" id="chartXMin" class="modal-text-input" value="-6.3" step="any" /></label>
+              <label>x max <input type="number" id="chartXMax" class="modal-text-input" value="6.3" step="any" /></label>
+            </div>
+            <p class="chart-hint">Kullanılabilir: + − * / ^ ( ) sin cos tan sqrt abs ln log exp pi</p>
+          </div>
+
+          <h4 class="modal-section-label">Renk</h4>
+          <div id="chartColorSwatches" class="chart-color-swatches"></div>
+        </div>
+
+        <div class="chart-preview-wrap">
+          <h4 class="modal-section-label">Önizleme</h4>
+          <canvas id="chartPreviewCanvas" width="360" height="240"></canvas>
+          <p id="chartErrorText" class="chart-hint chart-error hidden"></p>
+        </div>
+      </div>
+      <div class="modal-actions chart-footer">
+        <button type="button" id="chartCancelBtn" class="btn-secondary-sm">İptal</button>
+        <button type="button" id="chartInsertBtn" class="btn-primary-sm">✓ Sayfaya Ekle</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AYARLAR -->
+  <div id="settingsModal" class="modal-backdrop hidden">
+    <div class="modal-dialog modal-lg settings-dialog">
+      <div class="modal-header">
+        <div>
+          <h3>⚙️ Ayarlar</h3>
+          <p class="modal-sub">TabNote Studio'yu kendi kullanımınıza göre düzenleyin.</p>
+        </div>
+        <button type="button" id="closeSettingsModalBtn" class="icon-btn">✕</button>
+      </div>
+
+      <div class="modal-body settings-body">
+        <h4 class="modal-section-label">Kalem ve Yazı</h4>
+        <label class="settings-row">
+          <span class="settings-row-text"><strong>Basınç hassasiyeti</strong><small>Kalemi bastırdıkça çizgi kalınlaşır.</small></span>
+          <span class="switch"><input type="checkbox" id="setPressure" /><i></i></span>
+        </label>
+        <label class="settings-row">
+          <span class="settings-row-text"><strong>Otomatik şekil düzeltme</strong><small>Çizgi, daire veya dikdörtgen çizip kalemi bekletince düzgün şekle dönüşür.</small></span>
+          <span class="switch"><input type="checkbox" id="setAutoShape" /><i></i></span>
+        </label>
+        <label class="settings-row">
+          <span class="settings-row-text"><strong>Parmak sayfayı kaydırır</strong><small>Açıkken parmak kaydırır, yalnızca kalem yazar.</small></span>
+          <span class="switch"><input type="checkbox" id="setFingerScroll" /><i></i></span>
+        </label>
+
+        <h4 class="modal-section-label">Görünüm</h4>
+        <label class="settings-row">
+          <span class="settings-row-text"><strong>Kalem araçları açık olsun</strong><small>Kapalıyken daha geniş beyaz sayfa alanı kalır. Çentikle de açıp kapatabilirsiniz.</small></span>
+          <span class="switch"><input type="checkbox" id="setDockOpen" /><i></i></span>
+        </label>
+        <label class="settings-row">
+          <span class="settings-row-text"><strong>Alt durum ve yakınlaştırma çubuğu</strong><small>Sayfanın altındaki yakınlaştırma ve kaydırma düğmelerini gösterir.</small></span>
+          <span class="switch"><input type="checkbox" id="setShowHud" /><i></i></span>
+        </label>
+
+        <h4 class="modal-section-label">Veri</h4>
+        <button type="button" id="settingsExportAllBtn" class="settings-action-btn">
+          <strong>💾 Tüm defterleri yedekle</strong>
+          <small>Bütün not defterlerinizi tek bir .json dosyası olarak indirir.</small>
+        </button>
+        <button type="button" id="settingsWipeBtn" class="settings-action-btn danger">
+          <strong>🗑 Tüm verileri sil</strong>
+          <small>Bütün not defterleri silinir. Bu işlem geri alınamaz.</small>
+        </button>
+
+        <h4 class="modal-section-label">Hakkında</h4>
+        <div class="about-card">
+          <div class="brand-emblem about-logo"><img src="./logo.svg" alt="TabNote Studio" class="brand-logo-img" /></div>
+          <div>
+            <strong>TabNote Studio</strong>
+            <span>Sürüm 1.5.0 · Tablet ve kalem için not defteri</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-copyright">
+        <span>Uygulamayı yapan: <b>Erkan Cambaz</b></span>
+        <span>© 2026 Erkan Cambaz. Tüm hakları saklıdır.</span>
       </div>
     </div>
   </div>

@@ -6,6 +6,30 @@
 import { storage } from './storage.js';
 import { PAPER_TEMPLATES, PAPER_COLORS, renderPaperBackground } from './templates.js';
 import { CanvasEngine, PAGE_WIDTH, PAGE_HEIGHT } from './canvas-engine.js';
+import { drawChart, renderChartDataUrl, compileFunction, CHART_COLORS } from './chart-builder.js';
+
+const SETTINGS_KEY = 'tabnote_studio_settings_v1';
+const DEFAULT_SETTINGS = {
+  pressure: true,
+  autoShape: true,
+  fingerScroll: true,
+  dockOpen: true,
+  showHud: true
+};
+
+const TOOL_DEFAULT_SIZES = {
+  fountain: 4,
+  ballpoint: 3,
+  fineliner: 2,
+  pencil: 3,
+  brush: 10,
+  calligraphy: 12,
+  marker: 8,
+  crayon: 14,
+  highlighter: 22
+};
+
+const PEN_LIKE_TOOLS = Object.keys(TOOL_DEFAULT_SIZES);
 
 const INK_PALETTE = [
   '#0F172A', // Gece Mürekkebi (Siyah/Lacivert)
@@ -52,20 +76,32 @@ class TabNoteApp {
     this.recordedAudioDataUrl = null;
     this.recordedDurationSec = 0;
     this.autoDropAfterStop = false;
+
+    // Ayarlar, Kalem Boyutları ve Grafik Durumu
+    this.settings = { ...DEFAULT_SETTINGS };
+    this.toolSizes = { ...TOOL_DEFAULT_SIZES };
+    this.chartState = {
+      type: 'bar',
+      color: CHART_COLORS[0],
+      rows: []
+    };
   }
 
   async init() {
+    this.settings = this.loadSettings();
     this.folders = await storage.getFolders();
     this.notebooks = await storage.getAllNotebooks();
     this.activeNotebook = this.notebooks[0];
 
     this.initCanvasEngine();
     this.bindUIEvents();
+    this.bindDockAndSettings();
     this.renderSidebar();
     this.renderHomeScreen();
     this.loadActiveNotebookIntoWorkspace();
     this.updatePenToolbarUI();
     this.updatePenActiveUI();
+    this.applySettings();
     this.showHomeScreen();
     this.registerServiceWorker();
 
@@ -1340,20 +1376,19 @@ class TabNoteApp {
   }
 
   selectTool(toolName) {
+    const prevTool = this.engine.tool;
+    if (PEN_LIKE_TOOLS.includes(prevTool)) {
+      this.toolSizes[prevTool] = this.engine.strokeSize;
+    }
     this.engine.tool = toolName;
 
-    if (toolName === 'highlighter') {
-      if (this.engine.strokeSize < 14) {
-        this.engine.strokeSize = 22;
-      }
-      if (!HIGHLIGHTER_PALETTE.includes(this.engine.color)) {
-        this.engine.color = HIGHLIGHTER_PALETTE[0];
-      }
-    } else if (['fountain', 'ballpoint', 'pencil'].includes(toolName)) {
-      if (this.engine.strokeSize > 16) {
-        this.engine.strokeSize = 4;
-      }
-      if (HIGHLIGHTER_PALETTE.includes(this.engine.color)) {
+    if (PEN_LIKE_TOOLS.includes(toolName)) {
+      this.engine.strokeSize = this.toolSizes[toolName] ?? TOOL_DEFAULT_SIZES[toolName] ?? 4;
+      if (toolName === 'highlighter') {
+        if (!HIGHLIGHTER_PALETTE.includes(this.engine.color)) {
+          this.engine.color = HIGHLIGHTER_PALETTE[0];
+        }
+      } else if (HIGHLIGHTER_PALETTE.includes(this.engine.color)) {
         this.engine.color = INK_PALETTE[0];
       }
     }
@@ -1365,6 +1400,374 @@ class TabNoteApp {
     document.getElementById('shapeSubPanel').classList.toggle('hidden', toolName !== 'shape');
 
     this.updatePenToolbarUI();
+  }
+
+  /**
+   * KALEM İSTASYONU ÇENTİĞİ, AYARLAR PENCERESİ VE GRAFİK PENCERESİ
+   */
+  loadSettings() {
+    let saved = {};
+    try {
+      saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {};
+    } catch {
+      saved = {};
+    }
+    return { ...DEFAULT_SETTINGS, ...saved };
+  }
+
+  saveSettings() {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(this.settings));
+    } catch {}
+  }
+
+  syncSettingsInputs() {
+    const s = this.settings;
+    const set = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.checked = !!val;
+    };
+    set('setPressure', s.pressure);
+    set('setAutoShape', s.autoShape);
+    set('setFingerScroll', s.fingerScroll);
+    set('setDockOpen', s.dockOpen);
+    set('setShowHud', s.showHud);
+    set('pressureToggleChk', s.pressure);
+    set('autoShapeToggleChk', s.autoShape);
+  }
+
+  applySettings() {
+    const s = this.settings;
+    this.engine.pressureEnabled = s.pressure;
+    this.engine.autoShapeHold = s.autoShape;
+    this.engine.fingerScrollMode = s.fingerScroll;
+    document.querySelector('.studio-bottom-hud')?.classList.toggle('hidden', !s.showHud);
+    this.setDockOpen(s.dockOpen, false);
+    this.syncSettingsInputs();
+    this.updatePenActiveUI();
+  }
+
+  setDockOpen(open, persist = true) {
+    const wrap = document.getElementById('dockWrap');
+    const btn = document.getElementById('dockToggleBtn');
+    if (!wrap || !btn) return;
+    wrap.classList.toggle('collapsed', !open);
+    btn.setAttribute('aria-expanded', String(open));
+    btn.title = open ? 'Kalem araçlarını gizle' : 'Kalem araçlarını göster';
+    this.settings.dockOpen = open;
+    const chk = document.getElementById('setDockOpen');
+    if (chk) chk.checked = open;
+    if (persist) this.saveSettings();
+  }
+
+  openSettingsModal() {
+    this.syncSettingsInputs();
+    document.getElementById('settingsModal')?.classList.remove('hidden');
+  }
+
+  closeSettingsModal() {
+    document.getElementById('settingsModal')?.classList.add('hidden');
+  }
+
+  bindDockAndSettings() {
+    const appShell = document.getElementById('appShell');
+
+    // Çentik: kalem araçlarını aç / kapat
+    document.getElementById('dockToggleBtn')?.addEventListener('click', () => {
+      this.setDockOpen(document.getElementById('dockWrap').classList.contains('collapsed'));
+    });
+
+    // Dar ekranda sayfaya dokununca kenar çubuğu kapansın (beyaz alan ferah kalsın)
+    document.getElementById('canvasViewport')?.addEventListener(
+      'pointerdown',
+      () => {
+        if (window.innerWidth <= 1024) appShell?.classList.add('sidebar-collapsed');
+      },
+      { passive: true }
+    );
+
+    // Ayarlar penceresi
+    ['homeSettingsBtn', 'sidebarSettingsBtn'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('click', () => this.openSettingsModal());
+    });
+    document
+      .getElementById('closeSettingsModalBtn')
+      ?.addEventListener('click', () => this.closeSettingsModal());
+    document.getElementById('settingsModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'settingsModal') this.closeSettingsModal();
+    });
+
+    const bindToggle = (id, key, after) => {
+      document.getElementById(id)?.addEventListener('change', (e) => {
+        this.settings[key] = e.target.checked;
+        this.saveSettings();
+        if (after) after();
+        this.syncSettingsInputs();
+      });
+    };
+    bindToggle('setPressure', 'pressure', () => (this.engine.pressureEnabled = this.settings.pressure));
+    bindToggle('setAutoShape', 'autoShape', () => (this.engine.autoShapeHold = this.settings.autoShape));
+    bindToggle('setFingerScroll', 'fingerScroll', () => {
+      this.engine.fingerScrollMode = this.settings.fingerScroll;
+      this.updatePenActiveUI();
+    });
+    bindToggle('setDockOpen', 'dockOpen', () => this.setDockOpen(this.settings.dockOpen, false));
+    bindToggle('setShowHud', 'showHud', () =>
+      document.querySelector('.studio-bottom-hud')?.classList.toggle('hidden', !this.settings.showHud)
+    );
+
+    // Dock'taki kısayol anahtarları da ayarlara yansısın
+    document.getElementById('pressureToggleChk')?.addEventListener('change', (e) => {
+      this.settings.pressure = e.target.checked;
+      this.saveSettings();
+      this.syncSettingsInputs();
+    });
+    document.getElementById('autoShapeToggleChk')?.addEventListener('change', (e) => {
+      this.settings.autoShape = e.target.checked;
+      this.saveSettings();
+      this.syncSettingsInputs();
+    });
+    document.getElementById('fingerScrollToggleBtn')?.addEventListener('click', () => {
+      this.settings.fingerScroll = this.engine.fingerScrollMode;
+      this.saveSettings();
+      this.syncSettingsInputs();
+    });
+
+    // Tüm defterleri yedekle
+    document.getElementById('settingsExportAllBtn')?.addEventListener('click', async () => {
+      const all = await storage.getAllNotebooks();
+      const blob = new Blob([JSON.stringify({ app: 'TabNote Studio', notebooks: all }, null, 2)], {
+        type: 'application/json'
+      });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `tabnote-tum-defterler-${new Date().toISOString().slice(0, 10)}.tabnote.json`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+      this.showToast(`${all.length} defter yedeklendi.`);
+    });
+
+    // Tüm verileri sil (yazı ile onay)
+    document.getElementById('settingsWipeBtn')?.addEventListener('click', () => {
+      this.closeSettingsModal();
+      this.openPromptModal({
+        title: 'Tüm veriler silinecek! Onaylamak için SİL yazın',
+        placeholder: 'SİL',
+        defaultValue: '',
+        onConfirm: async (val) => {
+          if (val.trim().toLocaleLowerCase('tr') !== 'sil') {
+            this.showToast('Onay yazılmadığı için hiçbir şey silinmedi.');
+            return;
+          }
+          const all = await storage.getAllNotebooks();
+          for (const nb of all) {
+            await storage.deleteNotebook(nb.id);
+          }
+          this.notebooks = await storage.getAllNotebooks();
+          this.activeNotebook = this.notebooks[0];
+          this.renderSidebar();
+          this.loadActiveNotebookIntoWorkspace();
+          this.showHomeScreen();
+          this.showToast('Tüm veriler silindi, örnek defterler yeniden oluşturuldu.');
+        }
+      });
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      this.closeSettingsModal();
+      this.closeChartModal();
+    });
+
+    this.bindChartEvents();
+  }
+
+  /**
+   * GRAFİK EKLE PENCERESİ VE ÇİZİMİ
+   */
+  openChartModal() {
+    if (!this.chartState.rows.length) {
+      this.chartState.rows = [
+        { l: 'Ocak', v: '12' },
+        { l: 'Şubat', v: '19' },
+        { l: 'Mart', v: '8' },
+        { l: 'Nisan', v: '15' }
+      ];
+    }
+    this.renderChartRows();
+    this.renderChartSwatches();
+    this.applyChartType(this.chartState.type);
+    const canvas = document.getElementById('chartPreviewCanvas');
+    if (canvas) {
+      canvas.width = 720;
+      canvas.height = 480;
+    }
+    document.getElementById('chartModal')?.classList.remove('hidden');
+    this.updateChartPreview();
+  }
+
+  closeChartModal() {
+    document.getElementById('chartModal')?.classList.add('hidden');
+  }
+
+  applyChartType(type) {
+    this.chartState.type = type;
+    document.querySelectorAll('.chart-type-btn').forEach((b) => {
+      const on = b.dataset.chartType === type;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+    document.getElementById('chartDataPanel')?.classList.toggle('hidden', type === 'func');
+    document.getElementById('chartFuncPanel')?.classList.toggle('hidden', type !== 'func');
+    document.getElementById('chartColorSwatches')?.parentElement
+      ?.querySelectorAll('.chart-color-section')
+      .forEach((el) => el.classList.toggle('hidden', type === 'pie'));
+    this.updateChartPreview();
+  }
+
+  renderChartRows() {
+    const host = document.getElementById('chartDataRows');
+    if (!host) return;
+    host.innerHTML = '';
+    this.chartState.rows.forEach((row, idx) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'chart-row';
+
+      const label = document.createElement('input');
+      label.type = 'text';
+      label.className = 'chart-row-label';
+      label.placeholder = 'Etiket';
+      label.value = row.l;
+      label.setAttribute('aria-label', `Etiket ${idx + 1}`);
+      label.addEventListener('input', () => {
+        row.l = label.value;
+        this.updateChartPreview();
+      });
+
+      const val = document.createElement('input');
+      val.type = 'text';
+      val.inputMode = 'decimal';
+      val.className = 'chart-row-value';
+      val.placeholder = 'Değer';
+      val.value = row.v;
+      val.setAttribute('aria-label', `Değer ${idx + 1}`);
+      val.addEventListener('input', () => {
+        row.v = val.value;
+        this.updateChartPreview();
+      });
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'chart-row-del';
+      del.setAttribute('aria-label', `${idx + 1}. satırı sil`);
+      del.textContent = '✕';
+      del.addEventListener('click', () => {
+        if (this.chartState.rows.length <= 1) return;
+        this.chartState.rows.splice(idx, 1);
+        this.renderChartRows();
+        this.updateChartPreview();
+      });
+
+      wrap.append(label, val, del);
+      host.appendChild(wrap);
+    });
+  }
+
+  renderChartSwatches() {
+    const host = document.getElementById('chartColorSwatches');
+    if (!host) return;
+    host.innerHTML = '';
+    CHART_COLORS.forEach((hex) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chart-swatch';
+      b.style.backgroundColor = hex;
+      b.setAttribute('aria-label', `Grafik rengi ${hex}`);
+      b.classList.toggle('active', hex === this.chartState.color);
+      b.addEventListener('click', () => {
+        this.chartState.color = hex;
+        this.renderChartSwatches();
+        this.updateChartPreview();
+      });
+      host.appendChild(b);
+    });
+  }
+
+  getChartSpec() {
+    const rows = this.chartState.rows
+      .map((r) => ({
+        label: (r.l || '').trim() || '-',
+        value: parseFloat(String(r.v).replace(',', '.'))
+      }))
+      .filter((r) => isFinite(r.value));
+    return {
+      type: this.chartState.type,
+      title: (document.getElementById('chartTitleInput')?.value || '').trim(),
+      color: this.chartState.color,
+      labels: rows.map((r) => r.label),
+      values: rows.map((r) => r.value),
+      expr: document.getElementById('chartFuncInput')?.value || '',
+      xmin: Number(document.getElementById('chartXMin')?.value),
+      xmax: Number(document.getElementById('chartXMax')?.value)
+    };
+  }
+
+  updateChartPreview() {
+    const canvas = document.getElementById('chartPreviewCanvas');
+    if (!canvas) return;
+    const spec = this.getChartSpec();
+    drawChart(canvas.getContext('2d'), 720, 480, spec);
+  }
+
+  bindChartEvents() {
+    document.getElementById('openChartModalBtn')?.addEventListener('click', () => this.openChartModal());
+    ['closeChartModalBtn', 'chartCancelBtn'].forEach((id) =>
+      document.getElementById(id)?.addEventListener('click', () => this.closeChartModal())
+    );
+    document.getElementById('chartModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'chartModal') this.closeChartModal();
+    });
+
+    document.querySelectorAll('.chart-type-btn').forEach((btn) => {
+      btn.addEventListener('click', () => this.applyChartType(btn.dataset.chartType));
+    });
+
+    document.getElementById('chartAddRowBtn')?.addEventListener('click', () => {
+      if (this.chartState.rows.length >= 12) {
+        this.showToast('En fazla 12 veri satırı eklenebilir.');
+        return;
+      }
+      this.chartState.rows.push({ l: `Veri ${this.chartState.rows.length + 1}`, v: '' });
+      this.renderChartRows();
+    });
+
+    ['chartTitleInput', 'chartFuncInput', 'chartXMin', 'chartXMax'].forEach((id) =>
+      document.getElementById(id)?.addEventListener('input', () => this.updateChartPreview())
+    );
+
+    document.getElementById('chartInsertBtn')?.addEventListener('click', () => {
+      const spec = this.getChartSpec();
+      const err = document.getElementById('chartErrorText');
+      let message = '';
+      if (spec.type === 'func') {
+        if (!compileFunction(spec.expr)) message = 'Fonksiyon anlaşılamadı. Örn: x^2, sin(x), 2*x+1';
+        else if (!(spec.xmin < spec.xmax)) message = 'x min değeri x max değerinden küçük olmalı.';
+      } else if (spec.values.length === 0) {
+        message = 'Lütfen en az bir sayısal değer girin.';
+      }
+      if (message) {
+        if (err) {
+          err.textContent = message;
+          err.classList.remove('hidden');
+        }
+        return;
+      }
+      err?.classList.add('hidden');
+      const { dataUrl } = renderChartDataUrl(spec, 720, 480, 2);
+      this.engine.addImageToPage(dataUrl, 0, 480);
+      this.closeChartModal();
+      this.showToast('📊 Grafik sayfaya eklendi. Taşıyabilir ve boyutlandırabilirsiniz.');
+    });
   }
 
   setInkColor(hex) {

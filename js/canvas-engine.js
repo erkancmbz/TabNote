@@ -7,6 +7,35 @@ import { renderPaperBackground } from './templates.js';
 export const PAGE_WIDTH = 900;
 export const PAGE_HEIGHT = 1240;
 
+// Tüm çizim kalemleri ve parça parça (artımlı) çizilebilen kalemler
+export const PEN_TOOLS = [
+  'fountain',
+  'ballpoint',
+  'fineliner',
+  'pencil',
+  'brush',
+  'calligraphy',
+  'marker',
+  'crayon',
+  'highlighter'
+];
+const SEGMENT_TOOLS = new Set([
+  'fountain',
+  'ballpoint',
+  'fineliner',
+  'pencil',
+  'brush',
+  'calligraphy',
+  'marker',
+  'crayon'
+]);
+
+// Koordinata bağlı sabit sahte-rastgele sayı (pastel dokusu yeniden çizimde titremesin)
+function jitter(x, y, k) {
+  const s = Math.sin(Math.round(x) * 12.9898 + Math.round(y) * 78.233 + k * 37.719) * 43758.5453;
+  return s - Math.floor(s) - 0.5;
+}
+
 export class CanvasEngine {
   constructor({
     viewportEl,
@@ -768,7 +797,7 @@ export class CanvasEngine {
 
     // Artımlı (Incremental) O(1) Canlı Kalem Çizimi: tüm sayfayı silmeden sadece yeni eklenen segmenti çiz
     if (
-      (effectiveTool === 'fountain' || effectiveTool === 'ballpoint' || effectiveTool === 'pencil') &&
+      SEGMENT_TOOLS.has(effectiveTool) &&
       !this.snappedShapePreview &&
       !this.selection &&
       this.laserTrails.length === 0 &&
@@ -963,7 +992,7 @@ export class CanvasEngine {
   scheduleAutoShapeHold() {
     clearTimeout(this.holdTimer);
     if (!this.autoShapeHold) return;
-    if (!['fountain', 'ballpoint', 'pencil', 'highlighter'].includes(this.tool)) return;
+    if (!PEN_TOOLS.includes(this.tool)) return;
     if (this.currentPoints.length < 10) return;
 
     this.holdTimer = setTimeout(() => {
@@ -1538,7 +1567,7 @@ export class CanvasEngine {
         });
       } else if (this.snappedShapePreview) {
         this.drawGeometricShape(ctx, this.snappedShapePreview);
-      } else if (['fountain', 'ballpoint', 'pencil', 'highlighter'].includes(effectiveTool)) {
+      } else if (PEN_TOOLS.includes(effectiveTool)) {
         this.drawStroke(ctx, {
           tool: effectiveTool,
           color: this.color,
@@ -1653,6 +1682,102 @@ export class CanvasEngine {
     this.laserAnimFrame = requestAnimationFrame(step);
   }
 
+  /**
+   * Tek bir çizgi parçasını (pts[i-1] -> pts[i]) kalem türüne göre çizer.
+   * ctx durumu (renk, uç şekli, temel saydamlık) çağıran tarafından hazırlanır.
+   */
+  drawSegment(ctx, stroke, pts, i) {
+    const p0 = pts[i - 1];
+    const p1 = pts[i];
+    const pressure = ((p0.p || 0.5) + (p1.p || 0.5)) / 2;
+    const size = stroke.size;
+    const baseAlpha = stroke.opacity ?? 1;
+
+    // Yumuşatılmış (orta nokta) eğri başlangıç / bitiş noktaları
+    const mx = (p0.x + p1.x) / 2;
+    const my = (p0.y + p1.y) / 2;
+    const prevMidX = i > 1 ? (pts[i - 2].x + p0.x) / 2 : p0.x;
+    const prevMidY = i > 1 ? (pts[i - 2].y + p0.y) / 2 : p0.y;
+
+    switch (stroke.tool) {
+      case 'pencil': {
+        ctx.globalAlpha = Math.min(0.88, 0.32 + pressure * 0.55) * baseAlpha;
+        ctx.lineWidth = size * (0.65 + pressure * 0.55);
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.stroke();
+        return;
+      }
+
+      case 'fineliner': {
+        ctx.lineWidth = Math.max(0.8, size * 0.55);
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.stroke();
+        return;
+      }
+
+      case 'ballpoint': {
+        ctx.lineWidth = size;
+        break;
+      }
+
+      case 'marker': {
+        ctx.lineWidth = Math.max(4, size * 1.8);
+        break;
+      }
+
+      case 'brush': {
+        ctx.lineWidth = Math.max(0.8, size * (0.12 + pressure * 2.1));
+        break;
+      }
+
+      case 'calligraphy': {
+        // 45° kesik uç: çizginin kalınlığı hareket yönüne göre değişir
+        const half = Math.max(1.6, size * 0.95 * (0.75 + pressure * 0.4));
+        const dx = Math.SQRT1_2 * half;
+        const dy = -Math.SQRT1_2 * half;
+        ctx.beginPath();
+        ctx.moveTo(p0.x - dx, p0.y - dy);
+        ctx.lineTo(p0.x + dx, p0.y + dy);
+        ctx.lineTo(p1.x + dx, p1.y + dy);
+        ctx.lineTo(p1.x - dx, p1.y - dy);
+        ctx.closePath();
+        ctx.lineWidth = 0.6;
+        ctx.fill();
+        ctx.stroke();
+        return;
+      }
+
+      case 'crayon': {
+        // Pastel boya: üst üste binen titrek ince çizgilerle dokulu görünüm
+        const w = Math.max(2.4, size * 1.25);
+        const spread = w * 0.55;
+        for (let k = 0; k < 4; k++) {
+          ctx.globalAlpha = baseAlpha * (0.28 + (k % 2) * 0.22);
+          ctx.lineWidth = w * (0.34 + (k % 3) * 0.1);
+          ctx.beginPath();
+          ctx.moveTo(p0.x + jitter(p0.x, p0.y, k) * spread, p0.y + jitter(p0.y, p0.x, k + 7) * spread);
+          ctx.lineTo(p1.x + jitter(p1.x, p1.y, k) * spread, p1.y + jitter(p1.y, p1.x, k + 7) * spread);
+          ctx.stroke();
+        }
+        return;
+      }
+
+      default: {
+        // Dolma kalem: basınca duyarlı akıcı çizgi
+        ctx.lineWidth = Math.max(0.9, size * (0.32 + pressure * 1.15));
+      }
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(prevMidX, prevMidY);
+    ctx.quadraticCurveTo(p0.x, p0.y, mx, my);
+    ctx.stroke();
+  }
+
   drawStrokeIncremental(ctx, stroke, startIdx) {
     const pts = stroke.points;
     if (!pts || pts.length <= startIdx) return;
@@ -1665,36 +1790,7 @@ export class CanvasEngine {
     ctx.lineJoin = 'round';
 
     for (let i = Math.max(1, startIdx); i < pts.length; i++) {
-      const p0 = pts[i - 1];
-      const p1 = pts[i];
-
-      if (stroke.tool === 'pencil') {
-        const pressure = ((p0.p || 0.5) + (p1.p || 0.5)) / 2;
-        ctx.globalAlpha = Math.min(0.88, 0.32 + pressure * 0.55);
-        ctx.lineWidth = stroke.size * (0.65 + pressure * 0.55);
-        ctx.beginPath();
-        ctx.moveTo(p0.x, p0.y);
-        ctx.lineTo(p1.x, p1.y);
-        ctx.stroke();
-        continue;
-      }
-
-      const mx = (p0.x + p1.x) / 2;
-      const my = (p0.y + p1.y) / 2;
-      const prevMidX = i > 1 ? (pts[i - 2].x + p0.x) / 2 : p0.x;
-      const prevMidY = i > 1 ? (pts[i - 2].y + p0.y) / 2 : p0.y;
-
-      if (stroke.tool === 'ballpoint') {
-        ctx.lineWidth = stroke.size;
-      } else {
-        const pressure = ((p0.p || 0.5) + (p1.p || 0.5)) / 2;
-        ctx.lineWidth = Math.max(0.9, stroke.size * (0.32 + pressure * 1.15));
-      }
-
-      ctx.beginPath();
-      ctx.moveTo(prevMidX, prevMidY);
-      ctx.quadraticCurveTo(p0.x, p0.y, mx, my);
-      ctx.stroke();
+      this.drawSegment(ctx, stroke, pts, i);
     }
 
     ctx.restore();
@@ -1752,38 +1848,8 @@ export class CanvasEngine {
       return;
     }
 
-    if (stroke.tool === 'pencil') {
-      for (let i = 1; i < pts.length; i++) {
-        const p0 = pts[i - 1];
-        const p1 = pts[i];
-        const pressure = ((p0.p || 0.5) + (p1.p || 0.5)) / 2;
-        ctx.globalAlpha = Math.min(0.88, 0.32 + pressure * 0.55);
-        ctx.lineWidth = stroke.size * (0.65 + pressure * 0.55);
-        ctx.beginPath();
-        ctx.moveTo(p0.x, p0.y);
-        ctx.lineTo(p1.x, p1.y);
-        ctx.stroke();
-      }
-      ctx.restore();
-      return;
-    }
-
     for (let i = 1; i < pts.length; i++) {
-      const p0 = pts[i - 1];
-      const p1 = pts[i];
-      const mx = (p0.x + p1.x) / 2;
-      const my = (p0.y + p1.y) / 2;
-      const prevMidX = i > 1 ? (pts[i - 2].x + p0.x) / 2 : p0.x;
-      const prevMidY = i > 1 ? (pts[i - 2].y + p0.y) / 2 : p0.y;
-
-      const pressure = ((p0.p || 0.5) + (p1.p || 0.5)) / 2;
-      const dynamicWidth = Math.max(0.9, stroke.size * (0.32 + pressure * 1.15));
-
-      ctx.lineWidth = dynamicWidth;
-      ctx.beginPath();
-      ctx.moveTo(prevMidX, prevMidY);
-      ctx.quadraticCurveTo(p0.x, p0.y, mx, my);
-      ctx.stroke();
+      this.drawSegment(ctx, stroke, pts, i);
     }
 
     ctx.restore();
@@ -2242,20 +2308,22 @@ export class CanvasEngine {
     this.onChange();
   }
 
-  addImageToPage(dataUrl, offsetIndex = 0) {
+  addImageToPage(dataUrl, offsetIndex = 0, preferredWidth = 0) {
     const img = new Image();
     img.onload = () => {
       this.pushUndoSnapshot();
-      const maxW = 420;
+      const maxW = preferredWidth || 420;
       const ratio = img.naturalHeight / (img.naturalWidth || 1);
-      const w = Math.min(maxW, img.naturalWidth || 340);
+      const w = preferredWidth ? preferredWidth : Math.min(maxW, img.naturalWidth || 340);
       const h = Math.round(w * ratio);
       const offset = offsetIndex * 28;
+      const scrollY = this.viewportEl ? this.viewportEl.scrollTop / (this.zoom || 1) : 0;
+      const pageTop = preferredWidth ? Math.max(0, Math.round(scrollY % PAGE_HEIGHT)) : 0;
       this.page.images.push({
         id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         src: dataUrl,
         x: Math.min(PAGE_WIDTH - w - 20, Math.round((PAGE_WIDTH - w) / 2) + offset),
-        y: Math.min(PAGE_HEIGHT - h - 20, 140 + offset),
+        y: Math.max(20, Math.min(PAGE_HEIGHT - h - 20, 140 + pageTop + offset)),
         width: w,
         height: h
       });

@@ -16,7 +16,7 @@ fs.mkdirSync(assetsDir, { recursive: true });
 fs.mkdirSync(resDrawableDir, { recursive: true });
 fs.mkdirSync(resValuesDir, { recursive: true });
 
-// 1. ES Modüllerini (templates.js, storage.js, canvas-engine.js, app.js) Android WebView (file://) uyumlu tek bir bundle.js dosyasında birleştir
+// 1. ES Modüllerini (templates.js, storage.js, chart-builder.js, canvas-engine.js, app.js) Android WebView (file://) uyumlu tek bir bundle.js dosyasında birleştir
 const templatesCode = fs
   .readFileSync(path.join(__dirname, 'js', 'templates.js'), 'utf8')
   .replace(/export\s+const\s+/g, 'const ')
@@ -24,6 +24,11 @@ const templatesCode = fs
 
 const storageCode = fs
   .readFileSync(path.join(__dirname, 'js', 'storage.js'), 'utf8')
+  .replace(/export\s+const\s+/g, 'const ')
+  .replace(/export\s+function\s+/g, 'function ');
+
+const chartCode = fs
+  .readFileSync(path.join(__dirname, 'js', 'chart-builder.js'), 'utf8')
   .replace(/export\s+const\s+/g, 'const ')
   .replace(/export\s+function\s+/g, 'function ');
 
@@ -37,7 +42,7 @@ const appCode = fs
   .readFileSync(path.join(__dirname, 'js', 'app.js'), 'utf8')
   .replace(/import\s+\{[^}]+\}\s+from\s+['"][^'"]+['"];?/g, '');
 
-const combinedBundle = `/* TabNote Studio Android Bundle */\n(function(){\n${templatesCode}\n${storageCode}\n${engineCode}\n${appCode}\n})();\n`;
+const combinedBundle = `/* TabNote Studio Android Bundle */\n(function(){\n${templatesCode}\n${storageCode}\n${chartCode}\n${engineCode}\n${appCode}\n})();\n`;
 
 fs.writeFileSync(path.join(assetsDir, 'bundle.js'), combinedBundle, 'utf8');
 

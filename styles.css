@@ -3066,9 +3066,590 @@ button {
   border-top: 1px solid var(--border-hairline);
 }
 
-.create-nb-submit-btn {
-  padding: 10px 20px;
-  font-size: 13.5px;
+/* ==========================================================================
+   KALEM DOCK WRAP & AÇILIR-KAPANIR ÇENTİK (DOCK NOTCH)
+   ========================================================================== */
+.dock-wrap {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  background: var(--bg-chrome-elevated);
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
+
+.dock-notch-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -15px;
+  height: 16px;
+  pointer-events: none;
+  z-index: 35;
+}
+
+.dock-notch {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 14px;
+  height: 18px;
+  background: var(--bg-chrome-elevated);
+  border: 1px solid var(--border-hairline);
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
+  transition: all 0.18s ease;
+}
+
+.dock-notch:hover {
+  background: var(--bg-chrome-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  height: 20px;
+}
+
+.dock-notch-line {
+  display: block;
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.dock-notch-chevron {
+  transition: transform 0.22s ease;
+}
+
+.dock-wrap.collapsed .dock-notch-chevron {
+  transform: rotate(180deg);
+}
+
+.dock-wrap.collapsed .stylus-dock-bar {
+  max-height: 0 !important;
+  min-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+  border-bottom: none;
+  overflow: hidden;
+}
+
+.dock-wrap.collapsed .dock-notch-row {
+  position: relative;
+  bottom: 0;
+  height: 22px;
+  background: var(--bg-chrome-elevated);
+  border-bottom: 1px solid var(--border-hairline);
+}
+
+.dock-wrap.collapsed .dock-notch {
+  height: 20px;
+  border-top: 1px solid var(--border-hairline);
+  background: var(--bg-chrome);
+}
+
+/* ==========================================================================
+   SOL ÇEKMECE: ANA EKRAN BUTONU VE AYARLAR
+   ========================================================================== */
+.sidebar-home-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #111827;
+  color: #F8FAFC;
+  border: 1px solid #374151;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition: all 0.16s ease;
+}
+
+.sidebar-home-btn:hover {
+  background: #030712;
+  border-color: #60A5FA;
+  color: #FFFFFF;
+  transform: translateY(-1px);
+}
+
+.sidebar-home-btn svg {
+  flex-shrink: 0;
+}
+
+.sidebar-footer {
+  padding: 12px 14px;
+  border-top: 1px solid var(--border-hairline);
+  margin-top: auto;
+}
+
+.sidebar-settings-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid var(--border-hairline);
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.sidebar-settings-btn:hover {
+  background: var(--bg-chrome-hover);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+/* ==========================================================================
+   GRAFİK EKLE MODALI (CHART MODAL)
+   ========================================================================== */
+.chart-dialog {
+  max-width: 860px;
+  width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-type-selector {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px;
+  background: var(--bg-desk);
+  border-bottom: 1px solid var(--border-hairline);
+  overflow-x: auto;
+}
+
+.chart-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--bg-chrome);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+  white-space: nowrap;
+}
+
+.chart-type-btn:hover {
+  background: var(--bg-chrome-hover);
+  color: var(--text-primary);
+}
+
+.chart-type-btn.active {
+  background: #111827;
+  color: #FFFFFF;
+  border-color: #4B5563;
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.4);
+}
+
+.chart-layout-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  padding: 20px;
+  overflow-y: auto;
+  max-height: calc(90vh - 170px);
+}
+
+@media (max-width: 768px) {
+  .chart-layout-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.chart-form-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.chart-preview-col {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chart-preview-card {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.chart-preview-card canvas {
+  width: 100%;
+  height: auto;
+  max-height: 320px;
+  display: block;
+  border-radius: 6px;
+}
+
+.chart-preview-hint {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.chart-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chart-field label {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.chart-field input[type="text"],
+.chart-field input[type="number"] {
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--bg-desk);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  outline: none;
+}
+
+.chart-field input:focus {
+  border-color: #60A5FA;
+}
+
+.chart-range-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chart-range-row input {
+  width: 90px;
+}
+
+.chart-rows-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.chart-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.chart-row-label {
+  flex: 2;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--bg-desk);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+
+.chart-row-value {
+  flex: 1;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: var(--bg-desk);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+  font-size: 12.5px;
+}
+
+.chart-row-del {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--border-hairline);
+  color: #EF4444;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.chart-row-del:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #EF4444;
+}
+
+.chart-swatches-grid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chart-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.14s ease;
+}
+
+.chart-swatch:hover {
+  transform: scale(1.15);
+}
+
+.chart-swatch.active {
+  transform: scale(1.2);
+  border-color: #FFFFFF;
+  box-shadow: 0 0 0 2px #3B82F6;
+}
+
+.chart-error-banner {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid #EF4444;
+  color: #FCA5A5;
+  font-size: 12.5px;
+}
+
+/* ==========================================================================
+   AYARLAR MODALI (SETTINGS MODAL) & TELİF HAKKI
+   ========================================================================== */
+.settings-dialog {
+  max-width: 580px;
+  width: 92vw;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-section-title {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9CA3AF;
+  margin-bottom: 8px;
+}
+
+.settings-group {
+  background: var(--bg-desk);
+  border: 1px solid var(--border-hairline);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-hairline);
+  cursor: pointer;
+}
+
+.settings-row:last-child {
+  border-bottom: none;
+}
+
+.settings-label-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-label-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-label-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Toggle Switch */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider-switch {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #374151;
+  transition: 0.2s;
+  border-radius: 24px;
+}
+
+.slider-switch:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.2s;
+  border-radius: 50%;
+}
+
+.switch input:checked + .slider-switch {
+  background-color: #111827;
+  border: 1px solid #4B5563;
+}
+
+.switch input:checked + .slider-switch:before {
+  transform: translateX(20px);
+  background-color: #60A5FA;
+}
+
+.settings-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: 10px;
+  background: var(--bg-chrome);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-primary);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.settings-action-btn:hover {
+  background: var(--bg-chrome-hover);
+  border-color: var(--border-strong);
+}
+
+.settings-action-btn.danger-action {
+  color: #F87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.settings-action-btn.danger-action:hover {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: #EF4444;
+}
+
+/* Telif Hakkı ve Geliştirici Kartı */
+.settings-copyright-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  margin-top: 6px;
+}
+
+.copyright-badge-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #111827;
+  border: 1px solid #374151;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.copyright-text-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.copyright-app-name {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #F3F4F6;
+  letter-spacing: -0.01em;
+}
+
+.copyright-author {
+  font-size: 13px;
+  font-weight: 700;
+  color: #60A5FA;
+}
+
+.copyright-notice {
+  font-size: 11px;
+  color: #9CA3AF;
+}
+
+/* ==========================================================================
+   BEYAZ KAĞIT ALANINI VE PERFORMANSI MAKSİMİZE ETME
+   ========================================================================== */
+.canvas-viewport {
+  padding: 12px !important;
+}
+
+@media (max-width: 768px) {
+  .canvas-viewport {
+    padding: 4px !important;
+  }
+}
+
 
 
