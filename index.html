@@ -949,8 +949,8 @@
 
       <div class="devrem-main-tabs">
         <button type="button" class="devrem-tab-btn active" data-tab="kmap">🧩 Karnaugh Haritası (K-Map)</button>
-        <button type="button" class="devrem-tab-btn" data-tab="transformer">🔄 Transformatör Simülatörü</button>
-        <button type="button" class="devrem-tab-btn" data-tab="rlc">📈 RLC Rezonans &amp; Filtre</button>
+        <button type="button" class="devrem-tab-btn" data-tab="transformer">🔄 Transformatör Fazör &amp; Verim</button>
+        <button type="button" class="devrem-tab-btn" data-tab="bode">📈 Bode Filtre Spektrumu</button>
         <button type="button" class="devrem-tab-btn" data-tab="symbols">⚡ Devre Elemanları (R, C, L, Op-Amp)</button>
       </div>
 
@@ -958,7 +958,7 @@
         <!-- SEKME 1: KARNAUGH HARİTASI (K-MAP) -->
         <div id="devremKmapPane" class="devrem-tab-pane">
           <div class="devrem-pane-top-row">
-            <span class="pane-instruction">Değişken sayısını seçin ve 1 yapmak istediğiniz hücrelere dokunun:</span>
+            <span class="pane-instruction">Değişken sayısını seçin, hücrelere tıklayarak (0 → 1 → X) ayarlayın:</span>
             <div class="devrem-var-selector">
               <button type="button" class="devrem-var-btn" data-vars="2">2 Değişken (A, B)</button>
               <button type="button" class="devrem-var-btn active" data-vars="3">3 Değişken (A, B, C)</button>
@@ -968,7 +968,7 @@
           <div class="kmap-interactive-wrap">
             <div id="kmapInteractiveGrid" class="kmap-interactive-grid"></div>
             <div class="kmap-result-box">
-              <span class="kmap-res-label">Sadeleştirilmiş Boolean Çözümü:</span>
+              <span class="kmap-res-label">Devrem Studio — En Sadeleştirilmiş SOP Çözümü:</span>
               <div id="kmapResultExpr" class="kmap-res-expr">Y = ...</div>
               <p id="kmapResultMinterms" class="kmap-res-meta">Mintermler: ...</p>
               <button type="button" id="insertKmapToPageBtn" class="btn-primary-sm devrem-insert-btn">📄 Karnaugh Haritasını &amp; Çözümünü Sayfaya Ekle</button>
@@ -976,27 +976,35 @@
           </div>
         </div>
 
-        <!-- SEKME 2: TRANSFORMATÖR SİMÜLATÖRÜ -->
+        <!-- SEKME 2: TRANSFORMATÖR LABORATUVARI (DEVREM STUDIO) -->
         <div id="devremTransformerPane" class="devrem-tab-pane hidden">
           <div class="devrem-sim-grid">
             <div class="devrem-sim-controls">
+              <div class="devrem-sub-mode-row">
+                <button type="button" class="devrem-submode-btn active" data-trmode="0">Fazör &amp; Regülasyon</button>
+                <button type="button" class="devrem-submode-btn" data-trmode="1">Verim &amp; Yük Eğrisi</button>
+              </div>
+              <label class="devrem-ctrl-row">
+                <span>Anma Gücü (S_n) [kVA]:</span>
+                <input type="number" id="trPowerInput" class="modal-text-input" value="50" />
+              </label>
               <label class="devrem-ctrl-row">
                 <span>Primer Gerilimi (V₁) [Volt]:</span>
-                <input type="number" id="trV1Input" class="modal-text-input" value="220" />
+                <input type="number" id="trV1Input" class="modal-text-input" value="2400" />
               </label>
               <label class="devrem-ctrl-row">
-                <span>Primer Sarım (N₁):</span>
-                <input type="number" id="trN1Input" class="modal-text-input" value="1000" />
+                <span>Sekonder Gerilimi (V₂) [Volt]:</span>
+                <input type="number" id="trV2Input" class="modal-text-input" value="240" />
               </label>
               <label class="devrem-ctrl-row">
-                <span>Sekonder Sarım (N₂):</span>
-                <input type="number" id="trN2Input" class="modal-text-input" value="100" />
+                <span>Yüklenme Oranı (m):</span>
+                <input type="number" id="trLoadInput" step="0.05" min="0.1" max="1.3" class="modal-text-input" value="0.85" />
               </label>
               <label class="devrem-ctrl-row">
-                <span>Yük Direnci (R_L) [Ω]:</span>
-                <input type="number" id="trRlInput" class="modal-text-input" value="10" />
+                <span>Güç Faktörü cos(Φ):</span>
+                <input type="number" id="trPfInput" step="0.05" min="0.1" max="1.0" class="modal-text-input" value="0.80" />
               </label>
-              <button type="button" id="insertTransformerToPageBtn" class="btn-primary-sm devrem-insert-btn">📄 Transformatör Şemasını &amp; Analizini Sayfaya Ekle</button>
+              <button type="button" id="insertTransformerToPageBtn" class="btn-primary-sm devrem-insert-btn">📄 Transformatör Analizini Sayfaya Ekle</button>
             </div>
             <div class="devrem-sim-preview-card">
               <canvas id="transformerLiveCanvas" width="720" height="460" class="devrem-sim-canvas"></canvas>
@@ -1004,26 +1012,38 @@
           </div>
         </div>
 
-        <!-- SEKME 3: RLC REZONANS VE FİLTRE -->
-        <div id="devremRlcPane" class="devrem-tab-pane hidden">
+        <!-- SEKME 3: BODE FİLTRE LABORATUVARI (DEVREM STUDIO) -->
+        <div id="devremBodePane" class="devrem-tab-pane hidden">
           <div class="devrem-sim-grid">
             <div class="devrem-sim-controls">
+              <span class="ctrl-group-title">Filtre Tipi:</span>
+              <div class="devrem-sub-mode-row">
+                <button type="button" class="bode-type-btn active" data-bode="LPF">Alçak (LPF)</button>
+                <button type="button" class="bode-type-btn" data-bode="HPF">Yüksek (HPF)</button>
+                <button type="button" class="bode-type-btn" data-bode="BPF">Bant (BPF)</button>
+                <button type="button" class="bode-type-btn" data-bode="NOTCH">Çentik</button>
+              </div>
+
+              <span class="ctrl-group-title">Devrem Hazır Şablonlar:</span>
+              <div class="devrem-filter-presets">
+                <button type="button" class="bode-preset-btn" data-r="10" data-c="100" data-t="LPF">RC LPF (159 Hz)</button>
+                <button type="button" class="bode-preset-btn" data-r="10" data-c="15.9" data-t="BPF">Vokal BPF (1 kHz)</button>
+                <button type="button" class="bode-preset-btn" data-r="10" data-c="318" data-t="NOTCH">50Hz Çentik</button>
+                <button type="button" class="bode-preset-btn" data-r="1" data-c="7.96" data-t="LPF">Anti-Alias (20 kHz)</button>
+              </div>
+
               <label class="devrem-ctrl-row">
-                <span>Direnç (R) [Ω]:</span>
-                <input type="number" id="rlcRInput" class="modal-text-input" value="100" />
-              </label>
-              <label class="devrem-ctrl-row">
-                <span>İndüktans / Bobin (L) [mH]:</span>
-                <input type="number" id="rlcLInput" class="modal-text-input" value="10" />
+                <span>Direnç (R) [kΩ]:</span>
+                <input type="number" id="bodeRInput" class="modal-text-input" value="10" />
               </label>
               <label class="devrem-ctrl-row">
                 <span>Kapasite (C) [nF]:</span>
-                <input type="number" id="rlcCInput" class="modal-text-input" value="100" />
+                <input type="number" id="bodeCInput" class="modal-text-input" value="100" />
               </label>
-              <button type="button" id="insertRlcToPageBtn" class="btn-primary-sm devrem-insert-btn">📄 RLC Filtre Şemasını &amp; Grafiğini Sayfaya Ekle</button>
+              <button type="button" id="insertBodeToPageBtn" class="btn-primary-sm devrem-insert-btn">📄 Bode Frekans Grafiğini Sayfaya Ekle</button>
             </div>
             <div class="devrem-sim-preview-card">
-              <canvas id="rlcLiveCanvas" width="720" height="460" class="devrem-sim-canvas"></canvas>
+              <canvas id="bodeLiveCanvas" width="720" height="460" class="devrem-sim-canvas"></canvas>
             </div>
           </div>
         </div>

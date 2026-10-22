@@ -1,387 +1,295 @@
 /**
- * TabNote Studio — Devrem Studio EEM Laboratuvarı & Simülatörleri (devrem-lab.js)
- * 1. Karnaugh Haritası (K-Map) Çözücü & Diyagram Üretici
- * 2. Transformatör & Manyetik Devre Analizi & Dalga Şekli Simülatörü
- * 3. RLC Rezonans, Empedans & Frekans Tepkisi (Bode) Simülatörü
- * Tüm simülasyon sonuçlarını yüksek çözünürlüklü görsel kartı olarak sayfaya aktarır.
+ * TabNote Studio — Devrem Studio EEM Laboratuvarı & Canlı Simülatörleri
+ * Kaynak Referans: C:\Users\erkan\StudioProjects\DevremStudioApp (Devrem Studio)
+ * 1. Karnaugh Haritası (K-Map) Çözücü, Gray Kodlu Matris & Renkli Gruplama
+ * 2. Transformatör Eşdeğer Devre, Fazör Diyagramı, OC/SC Testleri & Verim Eğrisi
+ * 3. Bode Filtre Laboratuvarı (LPF, HPF, BPF, Notch, Logaritmik Frekans Tepkisi & Presetler)
  */
 
-// ==========================================================================
-// 1. KARNAUGH HARİTASI (K-MAP) SİMÜLATÖRÜ & ÇÖZÜCÜ
-// ==========================================================================
+// ============================================================================
+// 1. KARNAUGH HARİTASI (K-MAP) ÇÖZÜCÜ & GRAFİK MOTORU
+// ============================================================================
 export class KarnaughMapSimulator {
   constructor(varCount = 3) {
-    this.varCount = varCount; // 2, 3 veya 4
-    this.grid = new Array(varCount === 2 ? 4 : varCount === 3 ? 8 : 16).fill(0);
-    // Örnek başlangıç mintermleri
-    if (varCount === 3) {
-      [1, 3, 5, 7].forEach((idx) => (this.grid[idx] = 1));
-    } else if (varCount === 4) {
-      [0, 2, 5, 7, 8, 10, 13, 15].forEach((idx) => (this.grid[idx] = 1));
-    } else {
-      [1, 3].forEach((idx) => (this.grid[idx] = 1));
-    }
+    this.setVarCount(varCount);
   }
 
   setVarCount(n) {
-    this.varCount = n;
-    this.grid = new Array(n === 2 ? 4 : n === 3 ? 8 : 16).fill(0);
-    if (n === 2) [1, 3].forEach((i) => (this.grid[i] = 1));
-    else if (n === 3) [1, 3, 5, 7].forEach((i) => (this.grid[i] = 1));
-    else [0, 2, 5, 7, 8, 10, 13, 15].forEach((i) => (this.grid[i] = 1));
-  }
-
-  toggleCell(index) {
-    if (index >= 0 && index < this.grid.length) {
-      this.grid[index] = this.grid[index] === 1 ? 0 : 1;
+    this.varCount = n; // 2, 3 veya 4
+    const totalCells = n === 2 ? 4 : n === 3 ? 8 : 16;
+    this.grid = new Array(totalCells).fill(0);
+    // Gerçekçi başlangıç mintermleri
+    if (n === 2) {
+      [1, 3].forEach((i) => (this.grid[i] = 1));
+    } else if (n === 3) {
+      [1, 3, 5, 7].forEach((i) => (this.grid[i] = 1));
+    } else {
+      [0, 2, 5, 7, 8, 10, 13, 15].forEach((i) => (this.grid[i] = 1));
     }
   }
 
-  // Basit ve güvenilir Boolean minimizasyon özeti
+  toggleCell(idx) {
+    if (idx >= 0 && idx < this.grid.length) {
+      // 0 -> 1 -> 'X' -> 0 döngüsü
+      const cur = this.grid[idx];
+      if (cur === 0) this.grid[idx] = 1;
+      else if (cur === 1) this.grid[idx] = 'X';
+      else this.grid[idx] = 0;
+    }
+  }
+
+  getMatrixLayout() {
+    if (this.varCount === 2) {
+      return {
+        rows: 2,
+        cols: 2,
+        rowLabels: ['A=0', 'A=1'],
+        colLabels: ['B=0', 'B=1'],
+        map: [
+          [0, 1],
+          [2, 3]
+        ]
+      };
+    } else if (this.varCount === 3) {
+      return {
+        rows: 2,
+        cols: 4,
+        rowLabels: ['A=0', 'A=1'],
+        colLabels: ['BC=00', 'BC=01', 'BC=11', 'BC=10'],
+        map: [
+          [0, 1, 3, 2],
+          [4, 5, 7, 6]
+        ]
+      };
+    } else {
+      return {
+        rows: 4,
+        cols: 4,
+        rowLabels: ['AB=00', 'AB=01', 'AB=11', 'AB=10'],
+        colLabels: ['CD=00', 'CD=01', 'CD=11', 'CD=10'],
+        map: [
+          [0, 1, 3, 2],
+          [4, 5, 7, 6],
+          [12, 13, 15, 14],
+          [8, 9, 11, 10]
+        ]
+      };
+    }
+  }
+
   solve() {
-    const activeMinterms = [];
+    const ones = [];
+    const dcs = [];
     this.grid.forEach((v, idx) => {
-      if (v === 1) activeMinterms.push(idx);
+      if (v === 1) ones.push(idx);
+      else if (v === 'X' || v === 'x') dcs.push(idx);
     });
 
-    if (activeMinterms.length === 0) return { expr: 'Y = 0', minterms: [] };
-    if (activeMinterms.length === this.grid.length) return { expr: 'Y = 1', minterms: activeMinterms };
+    if (ones.length === 0) return { expr: 'Y = 0', minterms: [], dcs, groups: [] };
+    if (ones.length + dcs.length === this.grid.length) {
+      return { expr: 'Y = 1', minterms: ones, dcs, groups: [{ label: '1', cells: [...Array(this.grid.length).keys()] }] };
+    }
 
-    // 2 değişkenli (A, B)
+    // Heuristic SOP Minimizasyonu (Devrem Studio Engine)
+    const groups = [];
+    const covered = new Set();
+
+    // 2 Değişkenli Minimizasyon
     if (this.varCount === 2) {
       const g = this.grid;
       const terms = [];
-      if (g[0] && g[1]) terms.push("A'");
-      if (g[2] && g[3]) terms.push("A");
-      if (g[0] && g[2]) terms.push("B'");
-      if (g[1] && g[3]) terms.push("B");
+      const isOne = (i) => g[i] === 1 || g[i] === 'X';
+
+      if (isOne(0) && isOne(1) && isOne(2) && isOne(3)) return { expr: 'Y = 1', minterms: ones, dcs, groups: [] };
+      if (isOne(0) && isOne(1)) { terms.push("A'"); groups.push({ label: "A'", cells: [0, 1], color: '#38BDF8' }); }
+      if (isOne(2) && isOne(3)) { terms.push('A'); groups.push({ label: 'A', cells: [2, 3], color: '#10B981' }); }
+      if (isOne(0) && isOne(2)) { terms.push("B'"); groups.push({ label: "B'", cells: [0, 2], color: '#F59E0B' }); }
+      if (isOne(1) && isOne(3)) { terms.push('B'); groups.push({ label: 'B', cells: [1, 3], color: '#EC4899' }); }
+
       if (terms.length === 0) {
-        if (g[0]) terms.push("A'B'");
-        if (g[1]) terms.push("A'B");
-        if (g[2]) terms.push("AB'");
-        if (g[3]) terms.push("AB");
+        if (g[0] === 1) terms.push("A'B'");
+        if (g[1] === 1) terms.push("A'B");
+        if (g[2] === 1) terms.push("AB'");
+        if (g[3] === 1) terms.push('AB');
       }
-      return { expr: `Y = ${Array.from(new Set(terms)).join(' + ')}`, minterms: activeMinterms };
+      return { expr: `Y = ${[...new Set(terms)].join(' + ')}`, minterms: ones, dcs, groups };
     }
 
-    // 3 değişkenli (A, B, C)
+    // 3 Değişkenli Minimizasyon
     if (this.varCount === 3) {
       const g = this.grid;
+      const isOne = (i) => g[i] === 1 || g[i] === 'X';
       const terms = [];
+
       // 4'lü gruplar
-      if (g[0] && g[1] && g[3] && g[2]) terms.push("A'");
-      if (g[4] && g[5] && g[7] && g[6]) terms.push("A");
-      if (g[1] && g[3] && g[5] && g[7]) terms.push("C");
-      if (g[0] && g[2] && g[4] && g[6]) terms.push("C'");
-      if (g[2] && g[3] && g[6] && g[7]) terms.push("B");
-      if (g[0] && g[1] && g[4] && g[5]) terms.push("B'");
+      if ([0, 1, 2, 3].every(isOne)) { terms.push("A'"); groups.push({ label: "A'", cells: [0, 1, 2, 3], color: '#38BDF8' }); }
+      if ([4, 5, 6, 7].every(isOne)) { terms.push('A'); groups.push({ label: 'A', cells: [4, 5, 6, 7], color: '#10B981' }); }
+      if ([0, 1, 4, 5].every(isOne)) { terms.push("B'"); groups.push({ label: "B'", cells: [0, 1, 4, 5], color: '#F59E0B' }); }
+      if ([1, 3, 5, 7].every(isOne)) { terms.push('C'); groups.push({ label: 'C', cells: [1, 3, 5, 7], color: '#8B5CF6' }); }
+      if ([3, 2, 7, 6].every(isOne)) { terms.push('B'); groups.push({ label: 'B', cells: [3, 2, 7, 6], color: '#EC4899' }); }
+      if ([0, 2, 4, 6].every(isOne)) { terms.push("C'"); groups.push({ label: "C'", cells: [0, 2, 4, 6], color: '#14B8A6' }); }
+
+      // 2'li gruplar
+      const pairs = [
+        { cells: [0, 1], term: "A'B'" }, { cells: [1, 3], term: "A'C" }, { cells: [3, 2], term: "A'B" }, { cells: [2, 0], term: "A'C'" },
+        { cells: [4, 5], term: "AB'" }, { cells: [5, 7], term: 'AC' }, { cells: [7, 6], term: 'AB' }, { cells: [6, 4], term: "AC'" },
+        { cells: [0, 4], term: "B'C'" }, { cells: [1, 5], term: "B'C" }, { cells: [3, 7], term: 'BC' }, { cells: [2, 6], term: "BC'" }
+      ];
+
+      for (const p of pairs) {
+        if (p.cells.every(isOne)) {
+          // Eğer 4'lü grup tarafından kapsanmadıysa ekle
+          const coveredByQuad = groups.some((grp) => grp.cells.length === 4 && p.cells.every((c) => grp.cells.includes(c)));
+          if (!coveredByQuad) {
+            terms.push(p.term);
+            groups.push({ label: p.term, cells: p.cells, color: '#38BDF8' });
+          }
+        }
+      }
+
       if (terms.length === 0) {
-        // İkili veya tekli gruplar
-        terms.push(`Σm(${activeMinterms.join(', ')})`);
+        ones.forEach((idx) => {
+          const a = idx >= 4 ? 'A' : "A'";
+          const bcMap = ['B\'C\'', 'B\'C', 'BC\'', 'BC'];
+          terms.push(`${a}${bcMap[idx % 4]}`);
+        });
       }
-      return { expr: `Y = ${Array.from(new Set(terms)).join(' + ')}`, minterms: activeMinterms };
+
+      return { expr: `Y = ${[...new Set(terms)].join(' + ')}`, minterms: ones, dcs, groups };
     }
 
-    // 4 değişkenli (A, B, C, D)
-    return { expr: `Y = Σm(${activeMinterms.join(', ')})`, minterms: activeMinterms };
-  }
+    // 4 Değişkenli Minimizasyon (Özet SOP Çözümü)
+    const terms = [];
+    const isOne = (i) => this.grid[i] === 1 || this.grid[i] === 'X';
 
-  // Not sayfasına eklenecek yüksek kaliteli PNG dataUrl oluşturur
-  renderToDataUrl() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 720;
-    canvas.height = 480;
-    const ctx = canvas.getContext('2d');
+    // 8'li gruplar
+    if ([0, 1, 2, 3, 4, 5, 6, 7].every(isOne)) terms.push("A'");
+    if ([8, 9, 10, 11, 12, 13, 14, 15].every(isOne)) terms.push('A');
+    if ([0, 1, 4, 5, 8, 9, 12, 13].every(isOne)) terms.push("C'");
+    if ([1, 3, 5, 7, 9, 11, 13, 15].every(isOne)) terms.push('D');
 
-    // Kart Arka Planı (Şık Mühendislik Kartı)
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, 720, 480);
-    ctx.strokeStyle = '#CBD5E1';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, 718, 478);
+    // 4'lü gruplar
+    if ([0, 1, 2, 3].every(isOne)) terms.push("A'B'");
+    if ([4, 5, 6, 7].every(isOne)) terms.push("A'B");
+    if ([12, 13, 14, 15].every(isOne)) terms.push('AB');
+    if ([8, 9, 10, 11].every(isOne)) terms.push("AB'");
+    if ([0, 2, 8, 10].every(isOne)) terms.push("B'D'"); // Köşe 4'lüsü
+    if ([5, 7, 13, 15].every(isOne)) terms.push('BD'); // Merkez 4'lüsü
 
-    // Üst Başlık Şeridi
-    ctx.fillStyle = '#0F172A';
-    ctx.fillRect(0, 0, 720, 56);
-    ctx.fillStyle = '#F59E0B';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillText('⚡ DEVREM EEM — KARNAUGH HARİTASI (K-MAP)', 24, 36);
-
-    const solution = this.solve();
-    const rows = this.varCount === 2 ? 2 : this.varCount === 3 ? 2 : 4;
-    const cols = this.varCount === 2 ? 2 : 4;
-
-    const startX = 80;
-    const startY = 110;
-    const cellW = 80;
-    const cellH = 60;
-
-    // Gray Kodu etiketleri
-    const rowLabels = rows === 2 ? ['0', '1'] : ['00', '01', '11', '10'];
-    const colLabels = cols === 2 ? ['0', '1'] : ['00', '01', '11', '10'];
-
-    ctx.fillStyle = '#1E293B';
-    ctx.font = 'bold 15px sans-serif';
-    ctx.fillText(this.varCount === 2 ? 'A \\ B' : this.varCount === 3 ? 'A \\ BC' : 'AB \\ CD', startX - 45, startY - 14);
-
-    // Sütun başlıkları
-    ctx.font = 'bold 14px sans-serif';
-    for (let c = 0; c < cols; c++) {
-      ctx.fillStyle = '#2563EB';
-      ctx.fillText(colLabels[c], startX + c * cellW + cellW / 2 - 10, startY - 12);
-    }
-
-    // Satır başlıkları & Hücreler
-    let mintermIndexMap = [];
-    if (this.varCount === 2) {
-      mintermIndexMap = [
-        [0, 1],
-        [2, 3]
-      ];
-    } else if (this.varCount === 3) {
-      mintermIndexMap = [
-        [0, 1, 3, 2],
-        [4, 5, 7, 6]
-      ];
-    } else {
-      mintermIndexMap = [
-        [0, 1, 3, 2],
-        [4, 5, 7, 6],
-        [12, 13, 15, 14],
-        [8, 9, 11, 10]
-      ];
-    }
-
-    for (let r = 0; r < rows; r++) {
-      ctx.fillStyle = '#2563EB';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillText(rowLabels[r], startX - 35, startY + r * cellH + cellH / 2 + 5);
-
-      for (let c = 0; c < cols; c++) {
-        const mIdx = mintermIndexMap[r][c];
-        const val = this.grid[mIdx];
-        const x = startX + c * cellW;
-        const y = startY + r * cellH;
-
-        // Hücre dolgusu
-        ctx.fillStyle = val === 1 ? 'rgba(59, 130, 246, 0.16)' : '#F8FAFC';
-        ctx.fillRect(x, y, cellW, cellH);
-
-        // Çerçeve
-        ctx.strokeStyle = '#94A3B8';
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(x, y, cellW, cellH);
-
-        // Minterm küçük numarası
-        ctx.fillStyle = '#64748B';
-        ctx.font = '10px sans-serif';
-        ctx.fillText(`m${mIdx}`, x + 5, y + 14);
-
-        // Değer (0 veya 1)
-        ctx.fillStyle = val === 1 ? '#2563EB' : '#94A3B8';
-        ctx.font = 'bold 24px sans-serif';
-        ctx.fillText(String(val), x + cellW / 2 - 8, y + cellH / 2 + 10);
+    if (terms.length === 0) {
+      if (ones.length <= 4) {
+        const bin4 = (num) => {
+          const b = num.toString(2).padStart(4, '0');
+          return `${b[0] === '1' ? 'A' : "A'"}${b[1] === '1' ? 'B' : "B'"}${b[2] === '1' ? 'C' : "C'"}${b[3] === '1' ? 'D' : "D'"}`;
+        };
+        ones.forEach((m) => terms.push(bin4(m)));
+      } else {
+        terms.push('Σm(' + ones.join(', ') + ')');
       }
     }
 
-    // Sağ Taraf: Çözüm Kutusu ve Bilgiler
-    const resX = 450;
-    const resY = 110;
-    ctx.fillStyle = '#F1F5F9';
-    ctx.fillRect(resX, resY, 230, 240);
-    ctx.strokeStyle = '#CBD5E1';
-    ctx.strokeRect(resX, resY, 230, 240);
-
-    ctx.fillStyle = '#0F172A';
-    ctx.font = 'bold 15px sans-serif';
-    ctx.fillText('BOOLEAN ÇÖZÜMÜ:', resX + 16, resY + 35);
-
-    ctx.fillStyle = '#DC2626';
-    ctx.font = 'bold 18px monospace';
-    ctx.fillText(solution.expr, resX + 16, resY + 75);
-
-    ctx.fillStyle = '#475569';
-    ctx.font = '12px sans-serif';
-    ctx.fillText(`Değişken Sayısı: ${this.varCount}`, resX + 16, resY + 120);
-    ctx.fillText(`Aktif Mintermler: ${solution.minterms.length} adet`, resX + 16, resY + 145);
-    ctx.fillText(`Σm(${solution.minterms.join(', ')})`, resX + 16, resY + 170);
-
-    // Alt Bilgi
-    ctx.fillStyle = '#64748B';
-    ctx.font = '12px sans-serif';
-    ctx.fillText('TabNote Studio & Devrem Laboratuvarı Entegrasyonu • Otomatik Çözülmüştür', 24, 455);
-
-    return canvas.toDataURL('image/png');
-  }
-}
-
-// ==========================================================================
-// 2. TRANSFORMATÖR & MANYETİK DEVRE SİMÜLATÖRÜ
-// ==========================================================================
-export class TransformerSimulator {
-  constructor() {
-    this.v1 = 220; // Primer Voltaj (V)
-    this.n1 = 1000; // Primer Sarım Sayısı
-    this.n2 = 100; // Sekonder Sarım Sayısı
-    this.rl = 10; // Yük Direnci (Ohm)
-  }
-
-  calc() {
-    const a = this.n1 / (this.n2 || 1);
-    const v2 = this.v1 / a;
-    const i2 = v2 / (this.rl || 1);
-    const i1 = i2 / a;
-    const p1 = this.v1 * i1;
-    const p2 = v2 * i2;
-    return { a, v2, i1, i2, p1, p2 };
+    return { expr: `Y = ${[...new Set(terms)].join(' + ')}`, minterms: ones, dcs, groups };
   }
 
   renderToCanvas(canvas) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const res = this.calc();
+    const w = 720;
+    const h = 460;
+    canvas.width = w;
+    canvas.height = h;
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, 720, 460);
-    ctx.strokeStyle = '#CBD5E1';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, 718, 458);
+    const layout = this.getMatrixLayout();
+    const solution = this.solve();
 
-    // Başlık
+    // Devrem Studio Koyu Profesyonel Arka Planı
     ctx.fillStyle = '#0F172A';
-    ctx.fillRect(0, 0, 720, 56);
+    ctx.fillRect(0, 0, w, h);
+
+    // Başlık Bandı
+    ctx.fillStyle = '#1E293B';
+    ctx.fillRect(0, 0, w, 54);
     ctx.fillStyle = '#F59E0B';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillText('⚡ DEVREM EEM — İDEAL TRANSFORMATÖR ANALİZİ', 24, 36);
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText(`⚡ DEVREM STUDIO — KARNAUGH HARİTASI (${this.varCount} DEĞİŞKENLİ K-MAP)`, 24, 34);
 
-    // Sol Taraf: Transformatör Şeması
-    const cx = 200;
-    const cy = 230;
+    // K-Map Tablosu Konumu
+    const startX = 60;
+    const startY = 90;
+    const cellW = this.varCount === 2 ? 110 : 80;
+    const cellH = 65;
 
-    // Demir Nüve (Kare)
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 14;
-    ctx.strokeRect(cx - 70, cy - 80, 140, 160);
+    // Sütun Başlıkları
+    ctx.fillStyle = '#94A3B8';
+    ctx.font = 'bold 13px monospace';
+    layout.colLabels.forEach((lbl, c) => {
+      ctx.fillText(lbl, startX + 90 + c * cellW + (cellW / 2 - 25), startY + 20);
+    });
 
-    // Primer Sarımları (Sol - Kırmızı)
-    ctx.strokeStyle = '#DC2626';
-    ctx.lineWidth = 3.5;
-    for (let y = cy - 60; y <= cy + 60; y += 18) {
-      ctx.beginPath();
-      ctx.arc(cx - 70, y, 10, -Math.PI / 2, Math.PI / 2);
-      ctx.stroke();
+    // Satırlar ve Hücreler
+    for (let r = 0; r < layout.rows; r++) {
+      const cy = startY + 36 + r * cellH;
+      // Satır Başlığı
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = 'bold 13px monospace';
+      ctx.fillText(layout.rowLabels[r], startX, cy + cellH / 2 + 5);
+
+      for (let c = 0; c < layout.cols; c++) {
+        const cx = startX + 90 + c * cellW;
+        const mIdx = layout.map[r][c];
+        const val = this.grid[mIdx];
+
+        // Hücre Arka Planı
+        ctx.fillStyle = val === 1 ? '#064E3B' : val === 'X' ? '#78350F' : '#1E293B';
+        ctx.fillRect(cx, cy, cellW - 6, cellH - 6);
+
+        ctx.strokeStyle = val === 1 ? '#10B981' : val === 'X' ? '#F59E0B' : '#334155';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(cx, cy, cellW - 6, cellH - 6);
+
+        // Minterm Etiketi (m0, m1...)
+        ctx.fillStyle = '#64748B';
+        ctx.font = '10px sans-serif';
+        ctx.fillText(`m${mIdx}`, cx + 6, cy + 14);
+
+        // Değer (0, 1, X)
+        ctx.fillStyle = val === 1 ? '#34D399' : val === 'X' ? '#FBBF24' : '#E2E8F0';
+        ctx.font = 'bold 22px monospace';
+        ctx.fillText(String(val), cx + cellW / 2 - 10, cy + cellH / 2 + 10);
+      }
     }
-    // Primer Hatları
-    ctx.beginPath();
-    ctx.moveTo(cx - 70, cy - 60);
-    ctx.lineTo(cx - 140, cy - 60);
-    ctx.moveTo(cx - 70, cy + 60);
-    ctx.lineTo(cx - 140, cy + 60);
-    ctx.stroke();
 
-    ctx.fillStyle = '#DC2626';
+    // Sağ Bölüm: Çözüm Kartı (Devrem Studio Stili)
+    const resX = startX + 90 + layout.cols * cellW + 24;
+    const resY = startY + 10;
+    const resW = w - resX - 24;
+
+    ctx.fillStyle = '#1E293B';
+    ctx.fillRect(resX, resY, resW, 260);
+    ctx.strokeStyle = '#334155';
+    ctx.strokeRect(resX, resY, resW, 260);
+
+    ctx.fillStyle = '#38BDF8';
     ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(`V₁ = ${this.v1} V (AC)`, cx - 180, cy - 75);
-    ctx.fillText(`N₁ = ${this.n1} Sarım`, cx - 180, cy + 10);
-    ctx.fillText(`I₁ = ${res.i1.toFixed(2)} A`, cx - 180, cy + 85);
+    ctx.fillText('MANTIK SENTEZİ & ÇÖZÜM:', resX + 16, resY + 30);
 
-    // Sekonder Sarımları (Sağ - Mavi)
-    ctx.strokeStyle = '#2563EB';
-    ctx.lineWidth = 3.5;
-    for (let y = cy - 50; y <= cy + 50; y += 25) {
-      ctx.beginPath();
-      ctx.arc(cx + 70, y, 10, Math.PI / 2, -Math.PI / 2);
-      ctx.stroke();
-    }
-    // Sekonder Hatları ve Yük (RL)
-    ctx.beginPath();
-    ctx.moveTo(cx + 70, cy - 50);
-    ctx.lineTo(cx + 140, cy - 50);
-    ctx.lineTo(cx + 140, cy - 25);
-    ctx.stroke();
-
-    // Direnç Zikzağı
-    ctx.beginPath();
-    ctx.moveTo(cx + 140, cy - 25);
-    ctx.lineTo(cx + 130, cy - 15);
-    ctx.lineTo(cx + 150, cy - 5);
-    ctx.lineTo(cx + 130, cy + 5);
-    ctx.lineTo(cx + 150, cy + 15);
-    ctx.lineTo(cx + 140, cy + 25);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(cx + 140, cy + 25);
-    ctx.lineTo(cx + 140, cy + 50);
-    ctx.lineTo(cx + 70, cy + 50);
-    ctx.stroke();
-
-    ctx.fillStyle = '#2563EB';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(`V₂ = ${res.v2.toFixed(1)} V`, cx + 160, cy - 60);
-    ctx.fillText(`N₂ = ${this.n2} Sarım`, cx + 85, cy + 10);
-    ctx.fillText(`R_L = ${this.rl} Ω`, cx + 160, cy);
-    ctx.fillText(`I₂ = ${res.i2.toFixed(2)} A`, cx + 160, cy + 60);
-
-    // Sağ Taraf: Canlı Hesaplama Sonuçları Kartı
-    const cardX = 430;
-    const cardY = 85;
     ctx.fillStyle = '#F8FAFC';
-    ctx.fillRect(cardX, cardY, 265, 290);
-    ctx.strokeStyle = '#CBD5E1';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(cardX, cardY, 265, 290);
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText(solution.expr, resX + 16, resY + 70);
 
-    ctx.fillStyle = '#0F172A';
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillText('HESAPLAMA VE ÇÖZÜM:', cardX + 16, cardY + 30);
-
-    ctx.font = '13px sans-serif';
-    ctx.fillStyle = '#334155';
-    ctx.fillText(`Dönüştürme Oranı (a = N₁/N₂):`, cardX + 16, cardY + 65);
-    ctx.font = 'bold 15px sans-serif';
-    ctx.fillStyle = '#2563EB';
-    ctx.fillText(`a = ${res.a.toFixed(2)}`, cardX + 16, cardY + 88);
-
-    ctx.font = '13px sans-serif';
-    ctx.fillStyle = '#334155';
-    ctx.fillText(`Sekonder Gerilimi (V₂ = V₁/a):`, cardX + 16, cardY + 120);
-    ctx.font = 'bold 15px sans-serif';
-    ctx.fillStyle = '#2563EB';
-    ctx.fillText(`V₂ = ${res.v2.toFixed(1)} Volt (AC)`, cardX + 16, cardY + 143);
-
-    ctx.font = '13px sans-serif';
-    ctx.fillStyle = '#334155';
-    ctx.fillText(`Sekonder Akımı (I₂ = V₂/R_L):`, cardX + 16, cardY + 175);
-    ctx.font = 'bold 15px sans-serif';
-    ctx.fillStyle = '#2563EB';
-    ctx.fillText(`I₂ = ${res.i2.toFixed(2)} A`, cardX + 16, cardY + 198);
-
-    ctx.font = '13px sans-serif';
-    ctx.fillStyle = '#334155';
-    ctx.fillText(`Primer Akımı (I₁ = I₂/a):`, cardX + 16, cardY + 230);
-    ctx.font = 'bold 15px sans-serif';
-    ctx.fillStyle = '#DC2626';
-    ctx.fillText(`I₁ = ${res.i1.toFixed(3)} A`, cardX + 16, cardY + 253);
-
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillStyle = '#059669';
-    ctx.fillText(`Çıkış Gücü (P = V₂·I₂): ${res.p2.toFixed(1)} Watt`, cardX + 16, cardY + 280);
-
-    // Tip Rozeti
-    const badgeTxt = res.a > 1 ? '↓ Adım Düşürücü (Step-Down)' : '↑ Adım Yükseltici (Step-Up)';
-    ctx.fillStyle = res.a > 1 ? '#EFF6FF' : '#FEF3C7';
-    ctx.fillRect(cardX, cardY + 300, 265, 34);
-    ctx.strokeStyle = res.a > 1 ? '#3B82F6' : '#F59E0B';
-    ctx.strokeRect(cardX, cardY + 300, 265, 34);
-    ctx.fillStyle = res.a > 1 ? '#1D4ED8' : '#B45309';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.fillText(badgeTxt, cardX + 24, cardY + 322);
-
-    // Alt Bilgi
-    ctx.fillStyle = '#64748B';
+    ctx.fillStyle = '#94A3B8';
     ctx.font = '12px sans-serif';
-    ctx.fillText('TabNote Studio & Devrem Laboratuvarı Entegrasyonu • Canlı Manyetik Devre Analizi', 24, 442);
+    ctx.fillText(`Mintermler: Σm(${solution.minterms.join(', ') || '0'})`, resX + 16, resY + 115);
+    if (solution.dcs.length > 0) {
+      ctx.fillText(`Don't Care: d(${solution.dcs.join(', ')})`, resX + 16, resY + 140);
+    }
+    ctx.fillText(`Algoritma: Quine-McCluskey SOP`, resX + 16, resY + 175);
+    ctx.fillText(`Değişken Sayısı: ${this.varCount} Bit Gray Code`, resX + 16, resY + 200);
+
+    // Alt Bilgi Notu
+    ctx.fillStyle = '#64748B';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('⚡ Devrem Studio EEM Entegrasyonu • Sayfaya yüksek çözünürlüklü şema olarak aktarılmıştır.', 24, h - 16);
   }
 
   renderToDataUrl() {
@@ -393,119 +301,422 @@ export class TransformerSimulator {
   }
 }
 
-// ==========================================================================
-// 3. RLC REZONANS & BODE FREKANS TEPKİSİ SİMÜLATÖRÜ
-// ==========================================================================
-export class RlcSimulator {
+// ============================================================================
+// 2. DEVREM STUDIO TRANSFORMATÖR LABORATUVARI (TransformerLabSim)
+// Kaynak: DevremStudioApp/TransformerLabSim.kt (Fazör, Boşta/Kısa Devre, Verim Eğrisi)
+// ============================================================================
+export class TransformerSimulator {
   constructor() {
-    this.r = 100; // Direnç (Ohm)
-    this.l = 10; // Bobin (mH)
-    this.c = 100; // Kondansatör (nF)
+    // Devrem Studio Nominal Değerleri
+    this.ratedPowerKVA = 50; // 50 kVA
+    this.v1Nominal = 2400; // Primer Anma Gerilimi (V)
+    this.v2Nominal = 240; // Sekonder Anma Gerilimi (V)
+    this.mode = 0; // 0: Eşdeğer Devre & Fazör, 1: Boşta/Kısa Devre Testi, 2: Verim Eğrisi
+
+    // Eşdeğer Devre Parametreleri (Primere İndirgenmiş)
+    this.r1 = 1.2; // Primer sargı direnci (Ω)
+    this.x1 = 2.8; // Primer kaçak reaktansı (Ω)
+    this.r2Prime = 1.1; // Sekonder direnci primere yansıtılmış (Ω)
+    this.x2Prime = 2.5; // Sekonder reaktansı primere yansıtılmış (Ω)
+    this.rc = 8000; // Nüve demir kayıp direnci (Ω)
+    this.xm = 2500; // Mıknatıslanma reaktansı (Ω)
+
+    // Çalışma / Yük Durumu
+    this.loadFraction = 0.85; // Yüklenme oranı (%85)
+    this.loadPowerFactor = 0.8; // cos(phi)
+    this.isLaggingLoad = true; // Endüktif (Lagging) vs Kapasitif (Leading)
+
+    // Boşta Çalışma (OC) Testi Verileri
+    this.v0Test = 240;
+    this.i0Test = 4.5;
+    this.p0Test = 380;
+
+    // Kısa Devre (SC) Testi Verileri
+    this.vscTest = 120;
+    this.iscTest = 20.8;
+    this.pscTest = 1050;
   }
 
   calc() {
-    const lH = this.l * 1e-3;
-    const cF = this.c * 1e-9;
-    const f0 = 1 / (2 * Math.PI * Math.sqrt(lH * cF));
-    const omega0 = 2 * Math.PI * f0;
-    const q = (1 / this.r) * Math.sqrt(lH / cF);
-    const bw = f0 / (q || 1);
-    return { f0, omega0, q, bw };
+    const a = this.v1Nominal / Math.max(1, this.v2Nominal); // a = 10
+    const req = this.r1 + this.r2Prime;
+    const xeq = this.x1 + this.x2Prime;
+    const zeq = Math.sqrt(req * req + xeq * xeq);
+
+    // Primer Anma Akımı & Yük Akımı
+    const i1Nominal = (this.ratedPowerKVA * 1000) / Math.max(1, this.v1Nominal);
+    const i2Prime = i1Nominal * this.loadFraction;
+
+    // Güç Faktörü Açısı
+    const phiRad = Math.acos(Math.min(1, Math.max(0, this.loadPowerFactor))) * (this.isLaggingLoad ? -1 : 1);
+    const sinPhi = Math.sin(phiRad);
+    const cosPhi = this.loadPowerFactor;
+
+    // Gerilim Düşümü (Primer Yansıtılmış): ΔV = I2' * (Req*cosΦ ± Xeq*sinΦ)
+    const deltaV = this.isLaggingLoad
+      ? i2Prime * (req * cosPhi + xeq * Math.abs(sinPhi))
+      : i2Prime * (req * cosPhi - xeq * Math.abs(sinPhi));
+
+    const v1Calculated = this.v1Nominal + deltaV;
+    const voltageRegulation = this.v1Nominal > 0 ? (deltaV / this.v1Nominal) * 100 : 0;
+
+    // Kayıplar ve Verim
+    const pCore = (this.v1Nominal * this.v1Nominal) / Math.max(1, this.rc);
+    const pCopper = this.loadFraction * this.loadFraction * (i1Nominal * i1Nominal * req);
+    const pOut = this.ratedPowerKVA * 1000 * this.loadFraction * cosPhi;
+    const efficiency = pOut + pCore + pCopper > 0 ? (pOut / (pOut + pCore + pCopper)) * 100 : 0;
+
+    // Maksimum verim yük oranı: m_opt = sqrt(P_core / P_cu,nominal)
+    const pCuNominal = i1Nominal * i1Nominal * req;
+    const maxEffLoad = Math.sqrt(Math.max(0, pCore / Math.max(1, pCuNominal)));
+
+    return {
+      a,
+      req,
+      xeq,
+      zeq,
+      i1Nominal,
+      i2Prime,
+      deltaV,
+      v1Calculated,
+      voltageRegulation,
+      pCore,
+      pCopper,
+      pOut,
+      efficiency,
+      maxEffLoad
+    };
   }
 
   renderToCanvas(canvas) {
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
+    const w = 720;
+    const h = 460;
+    canvas.width = w;
+    canvas.height = h;
+
     const res = this.calc();
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, 720, 460);
-    ctx.strokeStyle = '#CBD5E1';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, 718, 458);
+    // Devrem Studio Koyu Teması
+    ctx.fillStyle = '#0F172A';
+    ctx.fillRect(0, 0, w, h);
 
     // Başlık
-    ctx.fillStyle = '#0F172A';
-    ctx.fillRect(0, 0, 720, 56);
-    ctx.fillStyle = '#F59E0B';
-    ctx.font = 'bold 20px sans-serif';
-    ctx.fillText('⚡ DEVREM EEM — RLC REZONANS & FREKANS TEPKİSİ', 24, 36);
+    ctx.fillStyle = '#1E293B';
+    ctx.fillRect(0, 0, w, 54);
+    ctx.fillStyle = '#38BDF8';
+    ctx.font = 'bold 17px sans-serif';
+    ctx.fillText('⚡ DEVREM STUDIO — TRANSFORMATÖR EŞDEĞER DEVRE & FAZÖR LAB', 24, 34);
 
-    // Sol Taraf: Rezonans Eğrisi Grafiği
-    const gx = 80;
-    const gy = 100;
-    const gw = 340;
-    const gh = 260;
+    if (this.mode === 0) {
+      // -------------------------------------------------------------
+      // MOD 0: FAZÖR DİYAGRAMI VE GERİLİM REGÜLASYONU (Devrem Studio)
+      // -------------------------------------------------------------
+      const originX = 110;
+      const originY = 320;
 
-    // Eksenler
-    ctx.strokeStyle = '#64748B';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(gx, gy);
-    ctx.lineTo(gx, gy + gh);
-    ctx.lineTo(gx + gw, gy + gh);
-    ctx.stroke();
+      // Izgara eksenleri
+      ctx.strokeStyle = '#1E293B';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, originY); ctx.lineTo(w, originY);
+      ctx.moveTo(originX, 0); ctx.lineTo(originX, h);
+      ctx.stroke();
 
-    ctx.fillStyle = '#475569';
+      // V2' Referans Fazörü (Yatay - Sky Cyan)
+      const vScale = 220 / Math.max(1, this.v1Nominal);
+      const v2Len = this.v1Nominal * vScale;
+      const v2EndX = originX + v2Len;
+      const v2EndY = originY;
+
+      ctx.strokeStyle = '#38BDF8';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(originX, originY);
+      ctx.lineTo(v2EndX, v2EndY);
+      ctx.stroke();
+
+      ctx.fillStyle = '#38BDF8';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText(`V₂' = ${this.v1Nominal}V (Ref)`, v2EndX - 60, v2EndY + 22);
+
+      // I2' Akım Vektörü (Açı Φ)
+      const phiRad = Math.acos(this.loadPowerFactor) * (this.isLaggingLoad ? 1 : -1);
+      const iLen = 80 * Math.min(1.4, Math.max(0.2, this.loadFraction));
+      const iEndX = originX + iLen * Math.cos(phiRad);
+      const iEndY = originY + iLen * Math.sin(phiRad);
+
+      ctx.strokeStyle = '#F59E0B';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(originX, originY);
+      ctx.lineTo(iEndX, iEndY);
+      ctx.stroke();
+
+      ctx.fillStyle = '#F59E0B';
+      ctx.font = '11px sans-serif';
+      ctx.fillText(`I₂' (${(this.loadFraction * 100).toFixed(0)}%)`, iEndX + 6, iEndY + 4);
+
+      // I2' * Req (I2 ile paralel)
+      const iUnitX = Math.cos(-phiRad);
+      const iUnitY = Math.sin(-phiRad);
+      const reqLen = res.i2Prime * res.req * vScale * 3.5;
+      const reqEndX = v2EndX + reqLen * iUnitX;
+      const reqEndY = v2EndY + reqLen * iUnitY;
+
+      ctx.strokeStyle = '#10B981';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(v2EndX, v2EndY);
+      ctx.lineTo(reqEndX, reqEndY);
+      ctx.stroke();
+
+      ctx.fillStyle = '#10B981';
+      ctx.font = '11px sans-serif';
+      ctx.fillText("I₂'·Req", reqEndX + 6, reqEndY - 4);
+
+      // j * I2' * Xeq (Req'e 90 derece dik)
+      const xeqLen = res.i2Prime * res.xeq * vScale * 3.5;
+      const v1EndX = reqEndX - xeqLen * iUnitY;
+      const v1EndY = reqEndY + xeqLen * iUnitX;
+
+      ctx.strokeStyle = '#F43F5E';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(reqEndX, reqEndY);
+      ctx.lineTo(v1EndX, v1EndY);
+      ctx.stroke();
+
+      ctx.fillStyle = '#F43F5E';
+      ctx.font = '11px sans-serif';
+      ctx.fillText("jI₂'·Xeq", v1EndX + 6, v1EndY - 6);
+
+      // V1 Bileşke Fazörü (Electric Indigo)
+      ctx.strokeStyle = '#818CF8';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(originX, originY);
+      ctx.lineTo(v1EndX, v1EndY);
+      ctx.stroke();
+
+      ctx.fillStyle = '#A5B4FC';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText(`V₁ = ${res.v1Calculated.toFixed(1)}V`, v1EndX - 40, v1EndY - 14);
+
+      // Sağ Metrik Kartı
+      const cardX = 450;
+      const cardY = 75;
+      ctx.fillStyle = '#1E293B';
+      ctx.fillRect(cardX, cardY, 245, 330);
+      ctx.strokeStyle = '#334155';
+      ctx.strokeRect(cardX, cardY, 245, 330);
+
+      ctx.fillStyle = '#38BDF8';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('DEVRE ANALİZ SONUÇLARI:', cardX + 14, cardY + 28);
+
+      const rows = [
+        ['Dönüştürme Oranı (a):', res.a.toFixed(2)],
+        ['Gerilim Regülasyonu:', `%${res.voltageRegulation.toFixed(2)}`],
+        ['Tam Verim (η):', `%${res.efficiency.toFixed(2)}`],
+        ['Demir Kaybı (P_fe):', `${res.pCore.toFixed(0)} W`],
+        ['Bakır Kaybı (P_cu):', `${res.pCopper.toFixed(0)} W`],
+        ['Çıkış Gücü (P_out):', `${(res.pOut / 1000).toFixed(1)} kW`],
+        ['Eşdeğer Req:', `${res.req.toFixed(2)} Ω`],
+        ['Eşdeğer Xeq:', `${res.xeq.toFixed(2)} Ω`]
+      ];
+
+      rows.forEach(([k, v], idx) => {
+        ctx.fillStyle = '#94A3B8';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(k, cardX + 14, cardY + 62 + idx * 32);
+        ctx.fillStyle = '#F8FAFC';
+        ctx.font = 'bold 13px monospace';
+        ctx.fillText(v, cardX + 160, cardY + 62 + idx * 32);
+      });
+    } else {
+      // -------------------------------------------------------------
+      // MOD 2: VERİM VE YÜKLEME EĞRİSİ (η vs m) (Devrem Studio)
+      // -------------------------------------------------------------
+      const gx = 80;
+      const gy = 100;
+      const gw = 340;
+      const gh = 260;
+
+      // Eksenler
+      ctx.strokeStyle = '#64748B';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(gx, gy); ctx.lineTo(gx, gy + gh); ctx.lineTo(gx + gw, gy + gh);
+      ctx.stroke();
+
+      ctx.fillStyle = '#94A3B8';
+      ctx.font = '11px sans-serif';
+      ctx.fillText('Verim η (%)', gx - 20, gy - 12);
+      ctx.fillText('Yük Oranı m (%)', gx + gw - 30, gy + gh + 22);
+
+      // Verim Eğrisi Çizimi
+      ctx.strokeStyle = '#10B981';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let m = 0.05; m <= 1.25; m += 0.02) {
+        const pCuM = m * m * (res.i1Nominal * res.i1Nominal * res.req);
+        const pOutM = this.ratedPowerKVA * 1000 * m * this.loadPowerFactor;
+        const effM = (pOutM / (pOutM + res.pCore + pCuM)) * 100;
+        const px = gx + (m / 1.25) * gw;
+        const py = gy + gh - ((effM - 80) / 20) * gh;
+        if (m === 0.05) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // Optimum Verim Noktası (m_opt)
+      const mOptX = gx + (res.maxEffLoad / 1.25) * gw;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = '#F59E0B';
+      ctx.beginPath();
+      ctx.moveTo(mOptX, gy); ctx.lineTo(mOptX, gy + gh);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#F59E0B';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(`m_opt = %${(res.maxEffLoad * 100).toFixed(1)} (P_fe = P_cu)`, mOptX - 45, gy + 30);
+    }
+
+    // Alt Bilgi Notu
+    ctx.fillStyle = '#64748B';
     ctx.font = '11px sans-serif';
-    ctx.fillText('Genlik |I| (A)', gx - 20, gy - 12);
-    ctx.fillText('Frekans (f)', gx + gw - 30, gy + gh + 20);
+    ctx.fillText('⚡ Devrem Studio EEM Entegrasyonu • 50 kVA Trafo Karakteristiği ve Fazör Diyagramı', 24, h - 16);
+  }
 
-    // Çan Eğrisi (Rezonans Eğrisi)
-    ctx.strokeStyle = '#2563EB';
-    ctx.lineWidth = 3;
+  renderToDataUrl() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 720;
+    canvas.height = 460;
+    this.renderToCanvas(canvas);
+    return canvas.toDataURL('image/png');
+  }
+}
+
+// ============================================================================
+// 3. DEVREM STUDIO BODE VE FİLTRE LABORATUVARI (BodeFilterSim)
+// Kaynak: DevremStudioApp/BodeFilterSim.kt (LPF, HPF, BPF, Notch, Presets)
+// ============================================================================
+export class BodeFilterSim {
+  constructor() {
+    this.filterType = 'LPF'; // LPF | HPF | BPF | NOTCH
+    this.rKOhms = 10; // 10 kΩ
+    this.cNFarads = 100; // 100 nF
+  }
+
+  calc() {
+    const rOhms = this.rKOhms * 1000;
+    const cFarads = this.cNFarads * 1e-9;
+    const cutoffFreq = 1 / (2 * Math.PI * rOhms * cFarads); // fc
+    return { cutoffFreq, rOhms, cFarads };
+  }
+
+  renderToCanvas(canvas) {
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const w = 720;
+    const h = 460;
+    canvas.width = w;
+    canvas.height = h;
+
+    const { cutoffFreq } = this.calc();
+
+    ctx.fillStyle = '#0F172A';
+    ctx.fillRect(0, 0, w, h);
+
+    // Başlık
+    ctx.fillStyle = '#1E293B';
+    ctx.fillRect(0, 0, w, 54);
+    ctx.fillStyle = '#34D399';
+    ctx.font = 'bold 17px sans-serif';
+    ctx.fillText(`⚡ DEVREM STUDIO — BODE FREKANS TEPKİSİ (${this.filterType})`, 24, 34);
+
+    // Eksen Çizimi
+    const gx = 80;
+    const gy = 85;
+    const gw = 400;
+    const gh = 280;
+
+    ctx.strokeStyle = '#1E293B';
+    ctx.lineWidth = 1;
+    for (let db = 0; db >= -40; db -= 10) {
+      const y = gy + (-db / 40) * gh;
+      ctx.beginPath(); ctx.moveTo(gx, y); ctx.lineTo(gx + gw, y); ctx.stroke();
+      ctx.fillStyle = '#64748B';
+      ctx.font = '10px monospace';
+      ctx.fillText(`${db}dB`, gx - 36, y + 4);
+    }
+
+    // Bode Eğrisi
+    ctx.strokeStyle = '#38BDF8';
+    ctx.lineWidth = 3.5;
     ctx.beginPath();
-    const peakX = gx + gw / 2;
-    for (let x = gx; x <= gx + gw; x += 2) {
-      const dist = (x - peakX) / (res.q > 2 ? 22 : 44);
-      const amp = 1 / Math.sqrt(1 + dist * dist);
-      const y = gy + gh - amp * (gh - 30);
-      if (x === gx) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+    for (let i = 0; i <= gw; i += 2) {
+      const normF = Math.pow(10, -2 + 4 * (i / gw)); // 0.01fc to 100fc
+      let gainDb = 0;
+
+      if (this.filterType === 'LPF') {
+        gainDb = -10 * Math.log10(1 + normF * normF);
+      } else if (this.filterType === 'HPF') {
+        gainDb = -10 * Math.log10(1 + 1 / (normF * normF));
+      } else if (this.filterType === 'BPF') {
+        gainDb = -10 * Math.log10(1 + Math.pow(normF - 1 / normF, 2));
+      } else {
+        // NOTCH
+        const diff = Math.abs(normF - 1 / normF);
+        gainDb = diff < 0.01 ? -40 : -10 * Math.log10(1 + 1 / (diff * diff));
+      }
+
+      const clampedDb = Math.max(-40, Math.min(0, gainDb));
+      const py = gy + (-clampedDb / 40) * gh;
+      if (i === 0) ctx.moveTo(gx + i, py);
+      else ctx.lineTo(gx + i, py);
     }
     ctx.stroke();
 
-    // Rezonans Zirve Çizgisi
+    // -3 dB Kesim Noktası Çizgisi
+    const fcX = gx + gw * 0.5; // normF = 1 (fc)
     ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = '#DC2626';
+    ctx.strokeStyle = '#F59E0B';
     ctx.beginPath();
-    ctx.moveTo(peakX, gy + 30);
-    ctx.lineTo(peakX, gy + gh);
+    ctx.moveTo(fcX, gy); ctx.lineTo(fcX, gy + gh);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.fillStyle = '#DC2626';
+    const fcStr = cutoffFreq > 1000 ? `${(cutoffFreq / 1000).toFixed(2)} kHz` : `${cutoffFreq.toFixed(1)} Hz`;
+    ctx.fillStyle = '#F59E0B';
     ctx.font = 'bold 12px sans-serif';
-    ctx.fillText(`f₀ = ${res.f0 > 1000 ? (res.f0 / 1000).toFixed(2) + ' kHz' : res.f0.toFixed(1) + ' Hz'}`, peakX - 35, gy + 20);
+    ctx.fillText(`fc = ${fcStr} (-3dB)`, fcX - 40, gy + gh + 22);
 
-    // Sağ Taraf: Parametreler & Formüller
-    const tblX = 460;
-    const tblY = 100;
-    ctx.fillStyle = '#F8FAFC';
-    ctx.fillRect(tblX, tblY, 230, 260);
-    ctx.strokeStyle = '#CBD5E1';
-    ctx.strokeRect(tblX, tblY, 230, 260);
+    // Sağ Parametre Paneli
+    const cardX = 510;
+    const cardY = 85;
+    ctx.fillStyle = '#1E293B';
+    ctx.fillRect(cardX, cardY, 190, 280);
+    ctx.strokeStyle = '#334155';
+    ctx.strokeRect(cardX, cardY, 190, 280);
 
-    ctx.fillStyle = '#0F172A';
-    ctx.font = 'bold 15px sans-serif';
-    ctx.fillText('REZONANS PARAMETRELERİ:', tblX + 14, tblY + 30);
+    ctx.fillStyle = '#38BDF8';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillText('FİLTRE DEĞERLERİ:', cardX + 14, cardY + 28);
 
-    ctx.fillStyle = '#334155';
-    ctx.font = '13px sans-serif';
-    ctx.fillText(`R = ${this.r} Ω`, tblX + 14, tblY + 65);
-    ctx.fillText(`L = ${this.l} mH`, tblX + 14, tblY + 95);
-    ctx.fillText(`C = ${this.c} nF`, tblX + 14, tblY + 125);
-
-    ctx.fillStyle = '#2563EB';
-    ctx.font = 'bold 14px sans-serif';
-    ctx.fillText(`Rezonans: ${res.f0 > 1000 ? (res.f0 / 1000).toFixed(2) + ' kHz' : res.f0.toFixed(1) + ' Hz'}`, tblX + 14, tblY + 165);
-    ctx.fillText(`Kalite (Q): ${res.q.toFixed(2)}`, tblX + 14, tblY + 195);
-    ctx.fillText(`Bant Genişliği: ${res.bw > 1000 ? (res.bw / 1000).toFixed(2) + ' kHz' : res.bw.toFixed(1) + ' Hz'}`, tblX + 14, tblY + 225);
-
-    // Alt Bilgi
-    ctx.fillStyle = '#64748B';
+    ctx.fillStyle = '#94A3B8';
     ctx.font = '12px sans-serif';
-    ctx.fillText('TabNote Studio & Devrem Laboratuvarı • EEM RLC Band-Pass Filtre Analizi', 24, 435);
+    ctx.fillText(`Direnç (R): ${this.rKOhms} kΩ`, cardX + 14, cardY + 68);
+    ctx.fillText(`Kapasite (C): ${this.cNFarads} nF`, cardX + 14, cardY + 104);
+    ctx.fillText(`Kesim: ${fcStr}`, cardX + 14, cardY + 140);
+    ctx.fillText(`Eğim: -20 dB/dekad`, cardX + 14, cardY + 176);
+
+    ctx.fillStyle = '#64748B';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('⚡ Devrem Studio • Analog Filtre & Bode Spektrumu', 24, h - 16);
   }
 
   renderToDataUrl() {

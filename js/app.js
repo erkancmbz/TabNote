@@ -8,7 +8,7 @@ import { PAPER_TEMPLATES, PAPER_COLORS, renderPaperBackground } from './template
 import { CanvasEngine, PAGE_WIDTH, PAGE_HEIGHT } from './canvas-engine.js';
 import { drawChart, renderChartDataUrl, compileFunction, CHART_COLORS } from './chart-builder.js';
 import { DEVREM_SYMBOLS, svgToDataUrl } from './devrem-symbols.js';
-import { KarnaughMapSimulator, TransformerSimulator, RlcSimulator } from './devrem-lab.js';
+import { KarnaughMapSimulator, TransformerSimulator, BodeFilterSim } from './devrem-lab.js';
 
 const SETTINGS_KEY = 'tabnote_studio_settings_v1';
 const DEFAULT_SETTINGS = {
@@ -91,7 +91,7 @@ class TabNoteApp {
     // Devrem EEM Simülatörleri
     this.kmapSim = new KarnaughMapSimulator(3);
     this.trSim = new TransformerSimulator();
-    this.rlcSim = new RlcSimulator();
+    this.bodeSim = new BodeFilterSim();
     this.devremActiveTab = 'kmap';
   }
 
@@ -1891,12 +1891,12 @@ class TabNoteApp {
   }
 
   /**
-   * DEVREM STUDIO EEM LABORATUVARI & SİMÜLATÖRLERİ
+   * DEVREM STUDIO EEM LABORATUVARI & SİMÜLATÖRLERİ (GERÇEK DEVREM ENTEGRASYONU)
    */
   openDevremModal() {
     this.renderKmapInteractive();
     this.renderTransformerPreview();
-    this.renderRlcPreview();
+    this.renderBodePreview();
     this.renderDevremSymbols('all');
     this.switchDevremTab(this.devremActiveTab || 'kmap');
     document.getElementById('devremModal')?.classList.remove('hidden');
@@ -1913,8 +1913,12 @@ class TabNoteApp {
     });
     document.getElementById('devremKmapPane')?.classList.toggle('hidden', tab !== 'kmap');
     document.getElementById('devremTransformerPane')?.classList.toggle('hidden', tab !== 'transformer');
-    document.getElementById('devremRlcPane')?.classList.toggle('hidden', tab !== 'rlc');
+    document.getElementById('devremBodePane')?.classList.toggle('hidden', tab !== 'bode');
     document.getElementById('devremSymbolsPane')?.classList.toggle('hidden', tab !== 'symbols');
+
+    if (tab === 'transformer') this.renderTransformerPreview();
+    else if (tab === 'bode') this.renderBodePreview();
+    else if (tab === 'kmap') this.renderKmapInteractive();
   }
 
   renderKmapInteractive() {
@@ -1922,23 +1926,17 @@ class TabNoteApp {
     if (!gridEl) return;
     gridEl.innerHTML = '';
     const sim = this.kmapSim;
-    const rows = sim.varCount === 2 ? 2 : sim.varCount === 3 ? 2 : 4;
-    const cols = sim.varCount === 2 ? 2 : 4;
-
-    let mintermMap = [];
-    if (sim.varCount === 2) mintermMap = [[0, 1], [2, 3]];
-    else if (sim.varCount === 3) mintermMap = [[0, 1, 3, 2], [4, 5, 7, 6]];
-    else mintermMap = [[0, 1, 3, 2], [4, 5, 7, 6], [12, 13, 15, 14], [8, 9, 11, 10]];
+    const layout = sim.getMatrixLayout();
 
     const table = document.createElement('table');
     table.className = 'kmap-table';
-    for (let r = 0; r < rows; r++) {
+    for (let r = 0; r < layout.rows; r++) {
       const tr = document.createElement('tr');
-      for (let c = 0; c < cols; c++) {
-        const mIdx = mintermMap[r][c];
+      for (let c = 0; c < layout.cols; c++) {
+        const mIdx = layout.map[r][c];
         const td = document.createElement('td');
         const val = sim.grid[mIdx];
-        td.className = `kmap-cell ${val === 1 ? 'active' : ''}`;
+        td.className = `kmap-cell ${val === 1 ? 'active' : val === 'X' ? 'dc' : ''}`;
         td.innerHTML = `<span class="kmap-minterm-tag">m${mIdx}</span><span class="kmap-val">${val}</span>`;
         td.addEventListener('click', () => {
           sim.toggleCell(mIdx);
@@ -1954,18 +1952,24 @@ class TabNoteApp {
     const exprEl = document.getElementById('kmapResultExpr');
     if (exprEl) exprEl.textContent = solution.expr;
     const metaEl = document.getElementById('kmapResultMinterms');
-    if (metaEl) metaEl.textContent = `Mintermler: Σm(${solution.minterms.join(', ') || '0'})`;
+    if (metaEl) {
+      const dcStr = solution.dcs && solution.dcs.length > 0 ? ` + d(${solution.dcs.join(', ')})` : '';
+      metaEl.textContent = `Mintermler: Σm(${solution.minterms.join(', ') || '0'})${dcStr}`;
+    }
   }
 
   renderTransformerPreview() {
-    const v1 = Number(document.getElementById('trV1Input')?.value || 220);
-    const n1 = Number(document.getElementById('trN1Input')?.value || 1000);
-    const n2 = Number(document.getElementById('trN2Input')?.value || 100);
-    const rl = Number(document.getElementById('trRlInput')?.value || 10);
-    this.trSim.v1 = v1;
-    this.trSim.n1 = n1;
-    this.trSim.n2 = n2;
-    this.trSim.rl = rl;
+    const power = Number(document.getElementById('trPowerInput')?.value || 50);
+    const v1 = Number(document.getElementById('trV1Input')?.value || 2400);
+    const v2 = Number(document.getElementById('trV2Input')?.value || 240);
+    const load = Number(document.getElementById('trLoadInput')?.value || 0.85);
+    const pf = Number(document.getElementById('trPfInput')?.value || 0.8);
+
+    this.trSim.ratedPowerKVA = power;
+    this.trSim.v1Nominal = v1;
+    this.trSim.v2Nominal = v2;
+    this.trSim.loadFraction = load;
+    this.trSim.loadPowerFactor = pf;
 
     const liveCv = document.getElementById('transformerLiveCanvas');
     if (liveCv) {
@@ -1973,17 +1977,15 @@ class TabNoteApp {
     }
   }
 
-  renderRlcPreview() {
-    const r = Number(document.getElementById('rlcRInput')?.value || 100);
-    const l = Number(document.getElementById('rlcLInput')?.value || 10);
-    const c = Number(document.getElementById('rlcCInput')?.value || 100);
-    this.rlcSim.r = r;
-    this.rlcSim.l = l;
-    this.rlcSim.c = c;
+  renderBodePreview() {
+    const r = Number(document.getElementById('bodeRInput')?.value || 10);
+    const c = Number(document.getElementById('bodeCInput')?.value || 100);
+    this.bodeSim.rKOhms = r;
+    this.bodeSim.cNFarads = c;
 
-    const liveCv = document.getElementById('rlcLiveCanvas');
+    const liveCv = document.getElementById('bodeLiveCanvas');
     if (liveCv) {
-      this.rlcSim.renderToCanvas(liveCv);
+      this.bodeSim.renderToCanvas(liveCv);
     }
   }
 
@@ -2061,8 +2063,18 @@ class TabNoteApp {
       this.showToast('📄 Karnaugh Haritası ve çözümü sayfaya eklendi!');
     });
 
+    // Transformatör Alt Modları (Fazör vs Verim Eğrisi)
+    document.querySelectorAll('.devrem-submode-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.devrem-submode-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.trSim.mode = Number(btn.dataset.trmode || 0);
+        this.renderTransformerPreview();
+      });
+    });
+
     // Transformatör Simülatör Girdi Dinleyicileri
-    ['trV1Input', 'trN1Input', 'trN2Input', 'trRlInput'].forEach((id) => {
+    ['trPowerInput', 'trV1Input', 'trV2Input', 'trLoadInput', 'trPfInput'].forEach((id) => {
       document.getElementById(id)?.addEventListener('input', () => this.renderTransformerPreview());
     });
 
@@ -2071,20 +2083,48 @@ class TabNoteApp {
       const dataUrl = this.trSim.renderToDataUrl();
       this.engine.addImageToPage(dataUrl, 0, 520);
       this.closeDevremModal();
-      this.showToast('📄 Transformatör şeması ve analizi sayfaya eklendi!');
+      this.showToast('📄 Transformatör analizi ve fazör şeması sayfaya eklendi!');
     });
 
-    // RLC Simülatör Girdi Dinleyicileri
-    ['rlcRInput', 'rlcLInput', 'rlcCInput'].forEach((id) => {
-      document.getElementById(id)?.addEventListener('input', () => this.renderRlcPreview());
+    // Bode Filtre Tipi Butonları (LPF, HPF, BPF, NOTCH)
+    document.querySelectorAll('.bode-type-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.bode-type-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        this.bodeSim.filterType = btn.dataset.bode;
+        this.renderBodePreview();
+      });
     });
 
-    // Sayfaya RLC Grafiğini Ekle
-    document.getElementById('insertRlcToPageBtn')?.addEventListener('click', () => {
-      const dataUrl = this.rlcSim.renderToDataUrl();
+    // Bode Hazır Şablonlar
+    document.querySelectorAll('.bode-preset-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const r = Number(btn.dataset.r);
+        const c = Number(btn.dataset.c);
+        const t = btn.dataset.t;
+        const rInp = document.getElementById('bodeRInput');
+        const cInp = document.getElementById('bodeCInput');
+        if (rInp) rInp.value = String(r);
+        if (cInp) cInp.value = String(c);
+        this.bodeSim.filterType = t;
+        document.querySelectorAll('.bode-type-btn').forEach((b) => {
+          b.classList.toggle('active', b.dataset.bode === t);
+        });
+        this.renderBodePreview();
+      });
+    });
+
+    // Bode Girdi Dinleyicileri
+    ['bodeRInput', 'bodeCInput'].forEach((id) => {
+      document.getElementById(id)?.addEventListener('input', () => this.renderBodePreview());
+    });
+
+    // Sayfaya Bode Spektrumunu Ekle
+    document.getElementById('insertBodeToPageBtn')?.addEventListener('click', () => {
+      const dataUrl = this.bodeSim.renderToDataUrl();
       this.engine.addImageToPage(dataUrl, 0, 520);
       this.closeDevremModal();
-      this.showToast('📄 RLC rezonans analizi ve grafiği sayfaya eklendi!');
+      this.showToast('📄 Bode frekans tepkisi spektrumu sayfaya eklendi!');
     });
 
     document.querySelectorAll('.devrem-cat-btn').forEach((btn) => {

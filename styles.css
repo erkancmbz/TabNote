@@ -3953,6 +3953,76 @@ button {
   padding: 14px;
 }
 
+.devrem-sub-mode-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.devrem-submode-btn,
+.bode-type-btn {
+  flex: 1;
+  min-width: 90px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--bg-chrome-elevated);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: center;
+}
+
+.devrem-submode-btn:hover,
+.bode-type-btn:hover {
+  background: var(--bg-chrome-hover);
+  color: var(--text-primary);
+}
+
+.devrem-submode-btn.active,
+.bode-type-btn.active {
+  background: #2563EB;
+  border-color: #3B82F6;
+  color: #FFFFFF;
+}
+
+.ctrl-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+
+.devrem-filter-presets {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.bode-preset-btn {
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--bg-chrome-elevated);
+  border: 1px solid var(--border-hairline);
+  color: #93C5FD;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bode-preset-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: #3B82F6;
+  color: #FFFFFF;
+}
+
 .devrem-ctrl-row {
   display: flex;
   flex-direction: column;
