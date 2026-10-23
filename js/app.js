@@ -239,13 +239,10 @@ class TabNoteApp {
       appShell.classList.add('sidebar-collapsed');
     }
 
-    const availWidth = Math.max(200, (vp.clientWidth || window.innerWidth) - 24);
-    if (availWidth < 900) {
-      const targetZoom = Math.max(0.4, Number((availWidth / 900).toFixed(2)));
-      this.engine.setZoom(targetZoom);
-    } else if (this.engine.zoom < 0.98) {
-      this.engine.setZoom(1.0);
-    }
+    const vpWidth = vp.clientWidth || window.innerWidth;
+    const availWidth = Math.max(260, vpWidth - (isPortrait ? 16 : 48));
+    const targetZoom = Math.min(1.0, Math.max(0.35, Number((availWidth / 900).toFixed(2))));
+    this.engine.setZoom(targetZoom);
     vp.scrollLeft = 0;
   }
 
@@ -1894,12 +1891,14 @@ class TabNoteApp {
    * DEVREM STUDIO EEM LABORATUVARI & SİMÜLATÖRLERİ (GERÇEK DEVREM ENTEGRASYONU)
    */
   openDevremModal() {
-    this.renderKmapInteractive();
-    this.renderTransformerPreview();
-    this.renderBodePreview();
-    this.renderDevremSymbols('all');
-    this.switchDevremTab(this.devremActiveTab || 'kmap');
-    document.getElementById('devremModal')?.classList.remove('hidden');
+    const modal = document.getElementById('devremModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+
+    const iframe = document.getElementById('devremStudioFrame');
+    if (iframe && (!iframe.src || iframe.src.indexOf('devrem-studio') === -1)) {
+      iframe.src = './devrem-studio/index.html#muhendislik-lab';
+    }
   }
 
   closeDevremModal() {
@@ -2039,100 +2038,29 @@ class TabNoteApp {
       if (e.target.id === 'devremModal') this.closeDevremModal();
     });
 
-    document.querySelectorAll('.devrem-tab-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        this.switchDevremTab(btn.dataset.tab);
-      });
+    // Modal üstündeki "Aktif Simülasyonu Not Sayfasına Ekle" butonu
+    document.getElementById('insertDevremCurrentToPageBtn')?.addEventListener('click', () => {
+      const iframe = document.getElementById('devremStudioFrame');
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({ type: 'REQUEST_CAPTURE_SIMULATION' }, '*');
+        try {
+          if (typeof iframe.contentWindow.exportCurrentSimulationToTabNote === 'function') {
+            iframe.contentWindow.exportCurrentSimulationToTabNote();
+          }
+        } catch (_) {}
+      }
     });
 
-    // Karnaugh Haritası Değişken Seçicisi
-    document.querySelectorAll('.devrem-var-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.devrem-var-btn').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.kmapSim.setVarCount(Number(btn.dataset.vars));
-        this.renderKmapInteractive();
-      });
-    });
-
-    // Sayfaya Karnaugh Haritası Ekle
-    document.getElementById('insertKmapToPageBtn')?.addEventListener('click', () => {
-      const dataUrl = this.kmapSim.renderToDataUrl();
-      this.engine.addImageToPage(dataUrl, 0, 520);
-      this.closeDevremModal();
-      this.showToast('📄 Karnaugh Haritası ve çözümü sayfaya eklendi!');
-    });
-
-    // Transformatör Alt Modları (Fazör vs Verim Eğrisi)
-    document.querySelectorAll('.devrem-submode-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.devrem-submode-btn').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.trSim.mode = Number(btn.dataset.trmode || 0);
-        this.renderTransformerPreview();
-      });
-    });
-
-    // Transformatör Simülatör Girdi Dinleyicileri
-    ['trPowerInput', 'trV1Input', 'trV2Input', 'trLoadInput', 'trPfInput'].forEach((id) => {
-      document.getElementById(id)?.addEventListener('input', () => this.renderTransformerPreview());
-    });
-
-    // Sayfaya Transformatör Analizini Ekle
-    document.getElementById('insertTransformerToPageBtn')?.addEventListener('click', () => {
-      const dataUrl = this.trSim.renderToDataUrl();
-      this.engine.addImageToPage(dataUrl, 0, 520);
-      this.closeDevremModal();
-      this.showToast('📄 Transformatör analizi ve fazör şeması sayfaya eklendi!');
-    });
-
-    // Bode Filtre Tipi Butonları (LPF, HPF, BPF, NOTCH)
-    document.querySelectorAll('.bode-type-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.bode-type-btn').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.bodeSim.filterType = btn.dataset.bode;
-        this.renderBodePreview();
-      });
-    });
-
-    // Bode Hazır Şablonlar
-    document.querySelectorAll('.bode-preset-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const r = Number(btn.dataset.r);
-        const c = Number(btn.dataset.c);
-        const t = btn.dataset.t;
-        const rInp = document.getElementById('bodeRInput');
-        const cInp = document.getElementById('bodeCInput');
-        if (rInp) rInp.value = String(r);
-        if (cInp) cInp.value = String(c);
-        this.bodeSim.filterType = t;
-        document.querySelectorAll('.bode-type-btn').forEach((b) => {
-          b.classList.toggle('active', b.dataset.bode === t);
-        });
-        this.renderBodePreview();
-      });
-    });
-
-    // Bode Girdi Dinleyicileri
-    ['bodeRInput', 'bodeCInput'].forEach((id) => {
-      document.getElementById(id)?.addEventListener('input', () => this.renderBodePreview());
-    });
-
-    // Sayfaya Bode Spektrumunu Ekle
-    document.getElementById('insertBodeToPageBtn')?.addEventListener('click', () => {
-      const dataUrl = this.bodeSim.renderToDataUrl();
-      this.engine.addImageToPage(dataUrl, 0, 520);
-      this.closeDevremModal();
-      this.showToast('📄 Bode frekans tepkisi spektrumu sayfaya eklendi!');
-    });
-
-    document.querySelectorAll('.devrem-cat-btn').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.devrem-cat-btn').forEach((b) => b.classList.remove('active'));
-        btn.classList.add('active');
-        this.renderDevremSymbols(btn.dataset.cat);
-      });
+    // Devrem iframe'inden gelen aktarım mesajlarını dinle
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'INSERT_DEVREM_TO_PAGE') {
+        const { dataUrl, title } = event.data;
+        if (dataUrl && this.engine && this.activeNotebook) {
+          this.engine.addImageToPage(dataUrl, 0, 560);
+          this.closeDevremModal();
+          this.showToast(`⚡ ${title || 'Devrem simülasyonu'} not sayfanıza eklendi!`);
+        }
+      }
     });
   }
 

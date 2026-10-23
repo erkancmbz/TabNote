@@ -358,10 +358,15 @@ export class CanvasEngine {
   }
 
   setZoom(newZoom) {
-    this.zoom = Math.max(0.45, Math.min(3.0, Number(newZoom.toFixed(2))));
+    this.zoom = Math.max(0.35, Math.min(3.0, Number(newZoom.toFixed(2))));
     this.pageWrapperEl.style.transform = `scale(${this.zoom})`;
     this.pageWrapperEl.style.transformOrigin = 'top center';
-    this.pageWrapperEl.style.marginBottom = `${Math.max(420, (this.zoom - 1) * PAGE_HEIGHT + 420)}px`;
+
+    const scaledWidth = Math.round(PAGE_WIDTH * this.zoom);
+    const diffX = Math.max(0, (PAGE_WIDTH - scaledWidth) / 2);
+    this.pageWrapperEl.style.marginLeft = diffX > 0 ? `-${diffX}px` : 'auto';
+    this.pageWrapperEl.style.marginRight = diffX > 0 ? `-${diffX}px` : 'auto';
+    this.pageWrapperEl.style.marginBottom = `${Math.max(280, (this.zoom - 1) * PAGE_HEIGHT + 380)}px`;
     this.activeCanvasRect = null;
     this.updateSelectionToolbarPosition();
     this.onStatusUpdate({ zoom: Math.round(this.zoom * 100) });
@@ -1017,12 +1022,13 @@ export class CanvasEngine {
   }
 
   scheduleAutoShapeHold() {
-    clearTimeout(this.holdTimer);
     if (!this.autoShapeHold) return;
     if (!PEN_TOOLS.includes(this.tool)) return;
     if (this.currentPoints.length < 10) return;
+    if (this.holdTimer) return;
 
     this.holdTimer = setTimeout(() => {
+      this.holdTimer = null;
       if (!this.isDrawing || this.currentPoints.length < 10) return;
       const recognized = this.recognizeGeometricShape(this.currentPoints);
       if (recognized) {

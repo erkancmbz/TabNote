@@ -70,6 +70,14 @@ htmlCode = htmlCode.replace(
 );
 fs.writeFileSync(path.join(assetsDir, 'index.html'), htmlCode, 'utf8');
 
+// 2c. Devrem Studio (44 EEM Simülasyonu) klasörünü assets içine kopyala
+const devremSrcDir = path.join(__dirname, 'devrem-studio');
+const devremDestDir = path.join(assetsDir, 'devrem-studio');
+if (fs.existsSync(devremSrcDir)) {
+  fs.cpSync(devremSrcDir, devremDestDir, { recursive: true });
+  console.log('✓ Devrem Studio 44 simülasyon klasörü APK assets içine kopyalandı.');
+}
+
 // 2b. Android Uygulama İkonu (res/drawable/ic_launcher.xml) oluştur
 const icLauncherXml = `<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
@@ -107,8 +115,8 @@ fs.writeFileSync(path.join(resDrawableDir, 'ic_launcher.xml'), icLauncherXml, 'u
 const manifestXml = `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.tabnote.studio"
-    android:versionCode="8"
-    android:versionName="1.7.0">
+    android:versionCode="9"
+    android:versionName="1.8.0">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
     <uses-permission android:name="android.permission.INTERNET" />
