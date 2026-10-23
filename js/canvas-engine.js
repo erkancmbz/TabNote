@@ -2352,21 +2352,24 @@ export class CanvasEngine {
   }
 
   addImageToPage(dataUrl, offsetIndex = 0, preferredWidth = 0) {
+    if (!dataUrl || typeof dataUrl !== 'string' || dataUrl.length < 50) return;
     const img = new Image();
     img.onload = () => {
       this.pushUndoSnapshot();
-      const maxW = preferredWidth || 420;
-      const ratio = img.naturalHeight / (img.naturalWidth || 1);
-      const w = preferredWidth ? preferredWidth : Math.min(maxW, img.naturalWidth || 340);
-      const h = Math.round(w * ratio);
+      const naturalW = img.naturalWidth || 600;
+      const naturalH = img.naturalHeight || 360;
+      const maxW = preferredWidth || 540;
+      const ratio = naturalH / naturalW;
+      const w = preferredWidth ? Math.min(PAGE_WIDTH - 60, preferredWidth) : Math.min(maxW, naturalW);
+      const h = Math.max(80, Math.round(w * ratio));
       const offset = offsetIndex * 28;
       const scrollY = this.viewportEl ? this.viewportEl.scrollTop / (this.zoom || 1) : 0;
-      const pageTop = preferredWidth ? Math.max(0, Math.round(scrollY % PAGE_HEIGHT)) : 0;
+      const pageTop = Math.max(0, Math.round(scrollY % PAGE_HEIGHT));
       this.page.images.push({
         id: `img-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         src: dataUrl,
-        x: Math.min(PAGE_WIDTH - w - 20, Math.round((PAGE_WIDTH - w) / 2) + offset),
-        y: Math.max(20, Math.min(PAGE_HEIGHT - h - 20, 140 + pageTop + offset)),
+        x: Math.max(20, Math.min(PAGE_WIDTH - w - 20, Math.round((PAGE_WIDTH - w) / 2) + offset)),
+        y: Math.max(20, Math.min(PAGE_HEIGHT - h - 20, 100 + pageTop + offset)),
         width: w,
         height: h
       });

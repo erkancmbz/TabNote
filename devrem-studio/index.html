@@ -14500,6 +14500,124 @@
         }
 
     </style>
+
+<style id="tabnotePureLabStyle">
+    /* ============================================================== */
+    /* TABNOTE STUDIO - SAF MÜHENDİSLİK LABORATUVARI MODU             */
+    /* Web sitesinin dış menülerini, hero alanını ve diğer kısımlarını  */
+    /* gizleyip YALNIZCA sol arama/kategori ve simülasyon IDE'sini açar*/
+    /* ============================================================== */
+    html, body {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        overflow: hidden !important;
+        background: #030712 !important;
+    }
+
+    /* Web sitesi üst menü, hero, portal kapısı ve diğer sayfaları gizle */
+    nav.navbar,
+    #navbar,
+    section.hero,
+    #hero,
+    #dallar,
+    #kutuphane,
+    #kurslar,
+    #araclar,
+    #yol-haritasi,
+    #ipuclari,
+    #kariyer,
+    #uye-paneli,
+    .career-hero,
+    footer,
+    .footer,
+    .devrem-portal-gate,
+    #devremPortalGate,
+    #electricSparksCanvas,
+    .section-header,
+    .lab-subtabs-bar {
+        display: none !important;
+    }
+
+    #muhendislik-lab {
+        display: block !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: 100vw !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+    }
+
+    #panel-muhendislik-lab,
+    #labSubpanelsContainer,
+    #labSubPanel-hesaplayicilar {
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+    }
+
+    .lab-ide-container {
+        display: grid !important;
+        grid-template-columns: 340px 1fr !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        max-height: 100vh !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        overflow: hidden !important;
+        background: #060913 !important;
+    }
+
+    .lab-ide-sidebar {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        overflow-y: auto !important;
+        border-right: 1px solid rgba(255, 255, 255, 0.08) !important;
+        background: rgba(15, 23, 42, 0.85) !important;
+    }
+
+    .lab-stage-area {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        overflow-y: auto !important;
+        padding: 20px 24px 100px 24px !important;
+        background: #030712 !important;
+    }
+
+    /* Simülasyon kartı içindeki Not Sayfasına Ekle butonu */
+    .devrem-to-tabnote-btn {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 8px 18px !important;
+        border-radius: 9px !important;
+        font-size: 0.86rem !important;
+        font-weight: 700 !important;
+        cursor: pointer !important;
+        margin-left: auto !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4) !important;
+        transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+        flex-shrink: 0 !important;
+    }
+
+    .devrem-to-tabnote-btn:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.55) !important;
+    }
+</style>
+
 </head>
 
 <body>
@@ -44574,83 +44692,178 @@ b) Alıcı uç geriliminin yüksüz durumda gönderici uç gerilimine göre yük
         })();
     </script>
 
-    <!-- TABNOTE STUDIO & DEVREM ENTEGRASYON KOPRUSU -->
+    
+    <!-- TABNOTE STUDIO & DEVREM ENTEGRASYON KÖPRÜSÜ (44 SİMÜLASYON) -->
     <script>
         (function() {
             window.exportCurrentSimulationToTabNote = async function() {
                 try {
-                    var activeCard = document.querySelector('.lab-ide-card:not([style*="display: none"])');
-                    var title = 'Devrem Simülasyonu';
-                    if (activeCard) {
-                        var titleEl = activeCard.querySelector('.lab-card-title, h3, h2, .section-title');
-                        if (titleEl) title = titleEl.textContent.trim();
+                    var toolId = window.currentActiveToolId;
+                    var activeCard = document.querySelector('.calc-card.ide-active-card') || 
+                                     (toolId ? document.getElementById(toolId) : null);
+
+                    // Eğer henüz bir simülasyon başlatılmamışsa (katalog görünümündeyse)
+                    if (!activeCard) {
+                        showExportToast('⚠️ Lütfen önce eklemek istediğiniz bir simülasyonu başlatın (Örn: Karnaugh, Transformatör, Fazör vb.)');
+                        return;
                     }
+
+                    var title = activeCard.getAttribute('data-title') || 
+                                activeCard.querySelector('.calc-header h3, h3, h2, .calc-card-title')?.textContent?.trim() || 
+                                'Devrem Simülasyonu';
+                    var subTitle = activeCard.getAttribute('data-sub') || 
+                                   activeCard.querySelector('.calc-formula-sub, p')?.textContent?.trim() || '';
 
                     var dataUrl = null;
 
-                    var kmapCard = document.getElementById('calcKarnaughCard');
-                    if (activeCard && (activeCard.id === 'calcKarnaughCard' || (kmapCard && kmapCard.style.display !== 'none'))) {
+                    // 1. ÖZEL DURUM: KARNAUGH HARİTASI (K-MAP)
+                    if (activeCard.id === 'calcKarnaughCard') {
                         dataUrl = generateKMapExportImage();
-                    } else if (activeCard && activeCard.querySelectorAll('canvas').length > 0) {
-                        var canvases = activeCard.querySelectorAll('canvas');
-                        if (canvases.length === 1) {
-                            dataUrl = canvases[0].toDataURL('image/png');
-                        } else {
-                            dataUrl = compositeCanvases(canvases);
-                        }
                     }
-
-                    if (!dataUrl) {
-                        var visibleCanvases = Array.from(document.querySelectorAll('canvas')).filter(function(c) {
-                            return c.offsetParent !== null && c.width > 50 && c.height > 50;
+                    // 2. CANVASA SAHİP TÜM SİMÜLASYONLAR (Transformatör, DC Motor, Fazör, Asenkron Motor, RLC Transient, Thevenin vb.)
+                    else {
+                        var canvases = Array.from(activeCard.querySelectorAll('canvas')).filter(function(c) {
+                            return c.width > 20 && c.height > 20 && c.offsetParent !== null;
                         });
-                        if (visibleCanvases.length > 0) {
-                            dataUrl = visibleCanvases[0].toDataURL('image/png');
+
+                        if (canvases.length > 0) {
+                            dataUrl = generateSimulationCanvasExportImage(activeCard, title, subTitle, canvases);
                         }
                     }
 
+                    // 3. EĞER CANVAS YOKSA VEYA HTML2CANVAS KULLANILACAKSA
                     if (!dataUrl && window.html2canvas && activeCard) {
                         var cvs = await window.html2canvas(activeCard, {
-                            backgroundColor: '#0f172a',
+                            backgroundColor: '#0a0e1a',
                             scale: 2,
-                            logging: false
+                            logging: false,
+                            useCORS: true
                         });
                         dataUrl = cvs.toDataURL('image/png');
                     }
 
-                    if (dataUrl) {
-                        if (window.parent && window.parent !== window) {
-                            window.parent.postMessage({
-                                type: 'INSERT_DEVREM_TO_PAGE',
-                                dataUrl: dataUrl,
-                                title: title
-                            }, '*');
-                        } else if (window.opener) {
-                            window.opener.postMessage({
-                                type: 'INSERT_DEVREM_TO_PAGE',
-                                dataUrl: dataUrl,
-                                title: title
-                            }, '*');
-                        }
-                        showExportToast('Not sayfasına aktarıldı: ' + title);
-                    } else {
-                        alert('Aktif simülasyon grafiği bulunamadı. Lütfen bir simülasyon seçin.');
+                    // 4. VERİ GEÇERLİLİK KONTROLÜ (Boş veya beyaz görsel engelleme)
+                    if (!dataUrl || dataUrl.length < 500) {
+                        showExportToast('⚠️ Simülasyon verisi hazır değil. Lütfen önce simülasyonu çalıştırıp tekrar deneyin.');
+                        return;
                     }
+
+                    // TabNote Studio ana uygulamasına postMessage ile aktar
+                    if (window.parent && window.parent !== window) {
+                        window.parent.postMessage({
+                            type: 'INSERT_DEVREM_TO_PAGE',
+                            dataUrl: dataUrl,
+                            title: title
+                        }, '*');
+                    } else if (window.opener) {
+                        window.opener.postMessage({
+                            type: 'INSERT_DEVREM_TO_PAGE',
+                            dataUrl: dataUrl,
+                            title: title
+                        }, '*');
+                    }
+
+                    showExportToast('✅ "' + title + '" not sayfasına aktarıldı!');
                 } catch (err) {
                     console.error('Export error:', err);
-                    alert('Görsel aktarılırken bir hata oluştu: ' + err.message);
+                    showExportToast('❌ Aktarım hatası: ' + err.message);
                 }
             };
 
             function showExportToast(msg) {
+                var existing = document.getElementById('tabnoteExportToast');
+                if (existing) existing.remove();
+
                 var toast = document.createElement('div');
-                toast.style.cssText = 'position:fixed;top:20px;right:20px;background:#10b981;color:#fff;padding:12px 20px;border-radius:10px;font-weight:700;z-index:999999;box-shadow:0 10px 30px rgba(0,0,0,0.5);font-family:sans-serif;transition:all 0.3s;';
+                toast.id = 'tabnoteExportToast';
+                toast.style.cssText = 'position:fixed;top:24px;right:24px;background:#10b981;color:#fff;padding:12px 22px;border-radius:10px;font-weight:700;font-size:14px;z-index:999999;box-shadow:0 10px 30px rgba(0,0,0,0.6);font-family:sans-serif;transition:all 0.25s ease;display:flex;align-items:center;gap:8px;';
+                if (msg.includes('⚠️')) toast.style.background = '#f59e0b';
+                if (msg.includes('❌')) toast.style.background = '#ef4444';
                 toast.textContent = msg;
                 document.body.appendChild(toast);
                 setTimeout(function() {
                     toast.style.opacity = '0';
                     setTimeout(function(){ toast.remove(); }, 300);
-                }, 2200);
+                }, 2600);
+            }
+
+            function generateSimulationCanvasExportImage(activeCard, title, subTitle, canvases) {
+                var totalCanvasH = 0;
+                var maxCanvasW = 0;
+                for (var i = 0; i < canvases.length; i++) {
+                    var cw = canvases[i].width || 760;
+                    var ch = canvases[i].height || 300;
+                    if (cw > maxCanvasW) maxCanvasW = cw;
+                    totalCanvasH += ch + 18;
+                }
+
+                var exportW = Math.max(860, maxCanvasW + 48);
+                var headerH = 88;
+                var padding = 22;
+                var exportH = headerH + totalCanvasH + padding + 32;
+
+                var comp = document.createElement('canvas');
+                comp.width = exportW;
+                comp.height = exportH;
+                var ctx = comp.getContext('2d');
+
+                // 1. Koyu Arka Plan
+                ctx.fillStyle = '#0a0e1a';
+                ctx.fillRect(0, 0, exportW, exportH);
+
+                // 2. Üst Kart Başlığı
+                ctx.fillStyle = '#111827';
+                ctx.fillRect(0, 0, exportW, headerH);
+                ctx.fillStyle = '#38bdf8';
+                ctx.fillRect(0, headerH - 3, exportW, 3);
+
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 22px Inter, sans-serif';
+                ctx.fillText('⚡ ' + title, 24, 40);
+
+                ctx.fillStyle = '#94a3b8';
+                ctx.font = '13px Inter, sans-serif';
+                ctx.fillText(subTitle || 'Devrem Studio EEM Mühendislik Laboratuvarı Çıktısı', 24, 66);
+
+                ctx.fillStyle = '#38bdf8';
+                ctx.font = 'bold 12px "JetBrains Mono", monospace';
+                ctx.textAlign = 'right';
+                ctx.fillText('DEVREM STUDIO • TABNOTE', exportW - 24, 40);
+                ctx.textAlign = 'left';
+
+                // 3. Canvases Çizimi
+                var curY = headerH + padding;
+                for (var j = 0; j < canvases.length; j++) {
+                    var srcC = canvases[j];
+                    var cw = srcC.width;
+                    var ch = srcC.height;
+                    var drawX = Math.round((exportW - cw) / 2);
+
+                    // Koyu çerçeve
+                    ctx.fillStyle = '#020617';
+                    ctx.strokeStyle = 'rgba(56, 189, 248, 0.3)';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    if (ctx.roundRect) ctx.roundRect(drawX - 2, curY - 2, cw + 4, ch + 4, 8);
+                    else ctx.rect(drawX - 2, curY - 2, cw + 4, ch + 4);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    try {
+                        ctx.drawImage(srcC, drawX, curY, cw, ch);
+                    } catch (e) {
+                        console.warn('Canvas çizim hatası:', e);
+                    }
+
+                    curY += ch + 18;
+                }
+
+                // 4. Alt Filigran
+                ctx.fillStyle = '#64748b';
+                ctx.font = '12px Inter, sans-serif';
+                ctx.fillText('TabNote Studio & Devrem EEM — devrem.com', 24, exportH - 12);
+
+                return comp.toDataURL('image/png');
             }
 
             function generateKMapExportImage() {
@@ -44660,39 +44873,47 @@ b) Alıcı uç geriliminin yüksüz durumda gönderici uç gerilimine göre yük
                 var expr = exprEl ? exprEl.textContent.trim() : 'F = Minimal SOP';
 
                 var canvas = document.createElement('canvas');
-                canvas.width = 820;
+                canvas.width = 840;
                 canvas.height = 560;
                 var ctx = canvas.getContext('2d');
 
-                ctx.fillStyle = '#0f172a';
+                // Koyu Arka Plan
+                ctx.fillStyle = '#0a0e1a';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                ctx.fillStyle = '#1e293b';
-                ctx.fillRect(0, 0, canvas.width, 70);
+                // Üst Başlık Kartı
+                ctx.fillStyle = '#111827';
+                ctx.fillRect(0, 0, canvas.width, 76);
                 ctx.fillStyle = '#38bdf8';
+                ctx.fillRect(0, 73, canvas.width, 3);
+
+                ctx.fillStyle = '#f8fafc';
                 ctx.font = 'bold 22px Inter, sans-serif';
                 ctx.fillText('⚡ Devrem Studio — Karnaugh Haritası (K-Map Çözümü)', 24, 44);
 
+                // Alt açıklama
                 ctx.fillStyle = '#94a3b8';
                 ctx.font = '14px Inter, sans-serif';
-                ctx.fillText(varCount + ' Değişkenli Minimal SOP ve Lojik Optimizasyonu', 24, 102);
+                ctx.fillText(varCount + ' Değişkenli Minimal SOP ve Sayısal Lojik Optimizasyonu', 24, 110);
 
-                ctx.fillStyle = '#1e293b';
+                // Sadeleştirilmiş Mantık İfadesi Kartı
+                ctx.fillStyle = '#0f172a';
                 ctx.strokeStyle = '#6366f1';
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                if (ctx.roundRect) ctx.roundRect(24, 118, 772, 60, 8);
-                else ctx.rect(24, 118, 772, 60);
+                if (ctx.roundRect) ctx.roundRect(24, 126, 792, 60, 10);
+                else ctx.rect(24, 126, 792, 60);
                 ctx.fill();
                 ctx.stroke();
 
                 ctx.fillStyle = '#10b981';
-                ctx.font = 'bold 20px "JetBrains Mono", monospace';
-                ctx.fillText(expr, 40, 155);
+                ctx.font = 'bold 22px "JetBrains Mono", monospace';
+                ctx.fillText(expr, 40, 164);
 
-                var startX = 30;
-                var startY = 215;
-                var cellW = varCount === 2 ? 160 : 125;
+                // K-Map Tablosu
+                var startX = 36;
+                var startY = 225;
+                var cellW = varCount === 2 ? 160 : 130;
                 var cellH = 58;
                 var rows = varCount === 2 ? 2 : (varCount === 3 ? 2 : 4);
                 var cols = varCount === 2 ? 2 : 4;
@@ -44719,7 +44940,7 @@ b) Alıcı uç geriliminin yüksüz durumda gönderici uç gerilimine göre yük
                         var cellX = startX + 90 + c * cellW;
                         var cellY = startY + r * cellH;
 
-                        ctx.fillStyle = '#060913';
+                        ctx.fillStyle = '#030712';
                         ctx.strokeStyle = '#334155';
                         ctx.lineWidth = 1.5;
                         ctx.fillRect(cellX, cellY, cellW, cellH);
@@ -44745,66 +44966,46 @@ b) Alıcı uç geriliminin yüksüz durumda gönderici uç gerilimine göre yük
                 return canvas.toDataURL('image/png');
             }
 
-            function compositeCanvases(canvases) {
-                var totalW = 0;
-                var maxH = 0;
-                for (var i = 0; i < canvases.length; i++) {
-                    totalW += canvases[i].width;
-                    if (canvases[i].height > maxH) maxH = canvases[i].height;
-                }
-                var comp = document.createElement('canvas');
-                comp.width = totalW;
-                comp.height = maxH;
-                var cctx = comp.getContext('2d');
-                var curX = 0;
-                for (var i = 0; i < canvases.length; i++) {
-                    cctx.drawImage(canvases[i], curX, 0);
-                    curX += canvases[i].width;
-                }
-                return comp.toDataURL('image/png');
-            }
-
+            // TabNote Studio üst çubuğundaki butondan gelen mesajı dinle
             window.addEventListener('message', function(e) {
                 if (e.data && e.data.type === 'REQUEST_CAPTURE_SIMULATION') {
                     window.exportCurrentSimulationToTabNote();
                 }
             });
 
+            // Her simülasyon başlığına "📝 Not Sayfasına Ekle" butonunu otomatik yerleştir
             function injectExportButtons() {
-                var cards = document.querySelectorAll('.lab-ide-card');
-                cards.forEach(function(card) {
-                    if (card.querySelector('.devrem-to-tabnote-btn')) return;
-                    var head = card.querySelector('.lab-card-header, .sim-header, h3');
+                var headers = document.querySelectorAll('.calc-card .calc-header');
+                headers.forEach(function(head) {
+                    if (head.querySelector('.devrem-to-tabnote-btn')) return;
                     var btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'devrem-to-tabnote-btn';
-                    btn.innerHTML = '<i class="fas fa-file-export"></i> 📝 Not Sayfasına Ekle';
-                    btn.style.cssText = 'background:linear-gradient(135deg, #10b981 0%, #059669 100%);color:#fff;border:none;padding:7px 16px;border-radius:8px;font-size:0.84rem;font-weight:700;cursor:pointer;margin-left:auto;display:inline-flex;align-items:center;gap:6px;box-shadow:0 3px 10px rgba(16,185,129,0.35);';
+                    btn.innerHTML = '📝 Not Sayfasına Ekle';
+                    btn.title = 'Bu simülasyonu / grafiği not defterine yüksek çözünürlüklü görsel olarak ekler';
                     btn.onclick = function(ev) {
                         ev.stopPropagation();
                         window.exportCurrentSimulationToTabNote();
                     };
-                    if (head) {
-                        head.style.display = 'flex';
-                        head.style.alignItems = 'center';
-                        head.appendChild(btn);
-                    }
+                    head.style.display = 'flex';
+                    head.style.alignItems = 'center';
+                    head.appendChild(btn);
                 });
             }
 
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', function() {
-                    setTimeout(injectExportButtons, 600);
+                    setTimeout(injectExportButtons, 400);
                 });
             } else {
-                setTimeout(injectExportButtons, 600);
+                setTimeout(injectExportButtons, 400);
             }
 
             var origSelectLabTool = window.selectLabTool;
             if (typeof origSelectLabTool === 'function') {
                 window.selectLabTool = function() {
                     var r = origSelectLabTool.apply(this, arguments);
-                    setTimeout(injectExportButtons, 350);
+                    setTimeout(injectExportButtons, 250);
                     return r;
                 };
             }
